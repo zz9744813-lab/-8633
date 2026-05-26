@@ -145,6 +145,11 @@ export interface ReflectionResult {
     add?: string[];
     remove?: string[];
   };
+  newWord?: {
+    word: string;
+    meaning: string;
+    etymology: string;
+  } | null;
 }
 
 // Reflection engine
@@ -159,7 +164,8 @@ export class ReflectionEngine {
   async reflect(
     agentId: string,
     agentState: AgentState,
-    currentTick: number
+    currentTick: number,
+    worldId?: string
   ): Promise<ReflectionResult | null> {
     const recentMemories = await this.memoryManager.getSTM(agentId, currentTick, 30);
 
@@ -186,7 +192,22 @@ Also evaluate their current long-term goals and decide if any should be:
 - Added (new ambitions that emerged from recent experiences)
 - Removed (goals that were completed, abandoned, or no longer relevant)
 
-Return JSON with the reflection and any goal updates.`;
+[Languages/Habits]
+If today you experienced something new or felt something for which existing words don't seem adequate,
+you might invent a new word or phrase (1-3 syllables, catchy, era-appropriate).
+Only do this if you genuinely feel a need for a new word — most days you won't.
+
+Return JSON with the reflection, any goal updates, and optionally a new word.`;
+
+      const H2_KNOWN_WORDS_KEY = `h2_known_${agentId}`;
+      let knownWords: { word: string; meaning: string }[] = [];
+      if (worldId) {
+        try {
+          const { lexiconRepo } = await import("@/db/lexicon-repository");
+          const words = await lexiconRepo.getAgentWords(agentId);
+          knownWords = words.map(w => ({ word: w.word, meaning: w.meaning }));
+        } catch { /* no lexicon db yet */ }
+      }
 
       const prompt = `Recent experiences:
 ${memorySummary}
@@ -194,14 +215,21 @@ ${memorySummary}
 Current long-term goals:
 ${currentGoals.length > 0 ? currentGoals.map((g, i) => `${i + 1}. ${g}`).join("\n") : "暂无明确长期目标"}
 
+${knownWords.length > 0 ? `[Town slang you know]\n${knownWords.map(w => `"${w.word}" means ${w.meaning}`).join("\n")}` : ""}
+
 What pattern or insight might this person have? Should their goals be updated?`;
 
       const ReflectionSchema = z.object({
         insight: z.string().describe("1-2 sentences reflection on recent experiences"),
         goalUpdates: z.object({
-          add: z.array(z.string()).optional().describe("New goals to add based on recent experiences"),
-          remove: z.array(z.string()).optional().describe("Goals to remove (completed or abandoned)"),
+          add: z.array(z.string()).optional().describe("New goals to add"),
+          remove: z.array(z.string()).optional().describe("Goals to remove"),
         }).optional(),
+        newWord: z.object({
+          word: z.string().describe("1-3 syllable catchy word"),
+          meaning: z.string().describe("what this word means"),
+          etymology: z.string().describe("why this word came about"),
+        }).optional().nullable().describe("A new word you invented, or null"),
       });
 
       const result = await llm.generateObject(prompt, ReflectionSchema, systemPrompt);
@@ -227,9 +255,32 @@ What pattern or insight might this person have? Should their goals be updated?`;
         tick: currentTick,
       });
 
+      // H2: Coin new word if LLM suggested one
+      if (result.newWord && worldId) {
+        try {
+          const { lexiconRepo } = await import("@/db/lexicon-repository");
+          const entry = await lexiconRepo.coinWord(
+            worldId, result.newWord.word, result.newWord.meaning,
+            agentId, currentTick
+          );
+          await lexiconRepo.learnWord(agentId, entry.id, null, currentTick, 1.0);
+          await this.memoryManager.addMemory({
+            agentId,
+            type: "reflection",
+            content: `你造了一个新词：「${result.newWord.word}」意为「${result.newWord.meaning}」`,
+            importance: 0.7,
+            tick: currentTick,
+          });
+          console.log(`[H2] ${agentId} coined "${result.newWord.word}" = "${result.newWord.meaning}"`);
+        } catch (e) {
+          console.error("[H2] Failed to coin word:", e);
+        }
+      }
+
       return {
         insight: trimmedInsight,
         goalUpdates: result.goalUpdates,
+        newWord: result.newWord ?? null,
       };
     } catch (error) {
       console.error("Reflection generation failed:", error);

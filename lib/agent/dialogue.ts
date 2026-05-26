@@ -113,6 +113,18 @@ Respond with JSON:
       // Record the conversation in memories
       await this.recordDialogue(context, speakerResponse.text, listenerResponse.text);
 
+      // H2: Propagate slang during conversation
+      try {
+        await this.propagateVocab(
+          context.speaker.id,
+          context.listener.id,
+          speakerResponse.text,
+          context.currentTick
+        );
+      } catch (e) {
+        // Vocab propagation is optional
+      }
+
       // Update relationship based on interaction
       const avgImpact = (speakerResponse.relationshipImpact + listenerResponse.relationshipImpact) / 2;
       if (avgImpact > 0) {
@@ -167,6 +179,27 @@ Respond with JSON:
         emotionalTone: "neutral",
         relationshipImpact: 0,
       };
+    }
+  }
+
+  // H2: Propagate slang from speaker to listener based on dialogue text
+  private async propagateVocab(
+    speakerId: string,
+    listenerId: string,
+    dialogueText: string,
+    tick: number
+  ): Promise<void> {
+    try {
+      const { lexiconRepo } = await import("@/db/lexicon-repository");
+      const speakerWords = await lexiconRepo.getAgentWords(speakerId);
+      for (const w of speakerWords) {
+        if (dialogueText.includes(w.word) && Math.random() < 0.7) {
+          await lexiconRepo.learnWord(listenerId, w.lexiconId, speakerId, tick);
+          await lexiconRepo.recordUsage(speakerId, w.lexiconId);
+        }
+      }
+    } catch (e) {
+      // Lexicon tables may not exist yet
     }
   }
 

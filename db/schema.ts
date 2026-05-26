@@ -206,6 +206,30 @@ export const agentsRelations = relations(agents, ({ one, many }) => ({
   home: one(buildings, { fields: [agents.homeId], references: [buildings.id] }),
 }));
 
+// ============ H2: Lexicon (emergent slang) ============
+export const lexicon = sqliteTable("lexicon", {
+  id: text("id").primaryKey(),
+  worldId: text("world_id").references(() => worlds.id).notNull(),
+  word: text("word").notNull(),
+  meaning: text("meaning").notNull(),
+  originAgentId: text("origin_agent_id").notNull(),
+  originTick: integer("origin_tick").notNull(),
+  parentWordId: text("parent_word_id"),
+  popularity: real("popularity").default(0.05),
+  status: text("status").default("coined"), // coined|spreading|mainstream|fading|dead
+});
+
+export const agentVocab = sqliteTable("agent_vocab", {
+  agentId: text("agent_id").notNull().references(() => agents.id),
+  lexiconId: text("lexicon_id").notNull().references(() => lexicon.id),
+  learnedFromAgentId: text("learned_from_agent_id"),
+  learnedTick: integer("learned_tick").notNull(),
+  usageCount: integer("usage_count").default(0),
+  fidelity: real("fidelity").default(1.0), // lower = more likely to mutate
+}, (t) => ({
+  pk: { columns: [t.agentId, t.lexiconId] },
+}));
+
 // ============ Reflections ============
 export const reflections = sqliteTable("reflections", {
   id: text("id").primaryKey(),

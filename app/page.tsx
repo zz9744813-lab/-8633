@@ -5,6 +5,7 @@ import { WorldView } from "@/components/world-view";
 import { TimeBar, GameSpeed } from "@/components/time-bar";
 import { ConfigPanel } from "@/components/config-panel";
 import { MemoryViewer } from "@/components/memory-viewer";
+import { MessagesSquare } from "lucide-react";
 import { EventLog } from "@/components/event-log";
 import { DialogueManager } from "@/components/dialogue-bubble";
 import { ChroniclePanel } from "@/components/chronicle-panel";
@@ -68,6 +69,7 @@ export default function Home() {
   const [isConnected, setIsConnected] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<AgentState | null>(null);
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
+  const [agentVocab, setAgentVocab] = useState<Array<{ word: string; meaning: string; usageCount: number; fidelity: number }>>([]);
 
   // SSE connection ref
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -129,6 +131,18 @@ export default function Home() {
       eventSourceRef.current?.close();
     };
   }, [connect]);
+
+  // H2: Fetch agent vocab when selection changes
+  useEffect(() => {
+    if (selectedAgent?.id) {
+      fetch(`/api/lexicon?agentId=${selectedAgent.id}`)
+        .then(r => r.json())
+        .then(d => setAgentVocab(d.words ?? []))
+        .catch(() => setAgentVocab([]));
+    } else {
+      setAgentVocab([]);
+    }
+  }, [selectedAgent?.id]);
 
   // Handlers
   const handleSpeedChange = useCallback((newSpeed: GameSpeed) => {
@@ -327,6 +341,24 @@ export default function Home() {
                       <li key={i}>{g}</li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {/* H2: Agent vocab display */}
+              {agentVocab.length > 0 && (
+                <div className="mt-3 text-xs">
+                  <div className="font-bold mb-1 flex items-center gap-1">
+                    <MessagesSquare className="w-3 h-3" />
+                    知道的私词
+                  </div>
+                  <div className="space-y-1 max-h-24 overflow-y-auto">
+                    {agentVocab.map((v, i) => (
+                      <div key={i} className="flex justify-between text-muted-foreground">
+                        <span>"{v.word}"</span>
+                        <span>{v.meaning}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

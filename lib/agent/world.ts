@@ -117,6 +117,16 @@ export class World {
       this.weatherIntensity = 0;
     }
 
+    // === H2.4: Daily lexicon popularity update (midnight) ===
+    if (hour === 0 && minute === 0 && this.agents.size > 0) {
+      try {
+        const { lexiconRepo } = await import("@/db/lexicon-repository");
+        await lexiconRepo.updatePopularity(this.id, this.agents.size);
+      } catch (e) {
+        // Lexicon tables may not exist yet
+      }
+    }
+
     // === G1.3: Daily health tick (midnight) ===
     if (hour === 0 && minute === 0) {
       for (const agent of this.agents.values()) {
@@ -296,7 +306,7 @@ export class World {
       for (const agent of this.agents.values()) {
         if (this.tickCount - (agent.lastReflectionTick ?? 0) >= 100) {
           try {
-            const result = await reflectionEngine.reflect(agent.id, agent.state, this.tickCount);
+            const result = await reflectionEngine.reflect(agent.id, agent.state, this.tickCount, this.id);
             if (result) {
               agent.lastReflectionTick = this.tickCount;
 

@@ -2,6 +2,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, generateObject, LanguageModel } from "ai";
 import { z } from "zod";
+import { getRateLimiter } from "./rate-limiter";
 
 export type LLMProvider = "anthropic" | "openai" | "ollama";
 
@@ -19,12 +20,15 @@ export interface LLMClient {
     schema: T,
     system?: string
   ): Promise<z.infer<T>>;
+  generateJSON<T>(prompt: string, system?: string): Promise<T>;
 }
 
 class LLMClientImpl implements LLMClient {
   private model: LanguageModel;
+  private config: LLMConfig;
 
   constructor(config: LLMConfig) {
+    this.config = config;
     this.model = this.createModel(config);
   }
 
@@ -51,6 +55,20 @@ class LLMClientImpl implements LLMClient {
   }
 
   async generateText(prompt: string, system?: string): Promise<string> {
+    // Check rate limit
+    const rateLimiter = getRateLimiter();
+    if (rateLimiter) {
+      const status = rateLimiter.canMakeCall();
+      if (!status.allowed) {
+        if (status.waitMs && status.waitMs < 30000) {
+          await new Promise((resolve) => setTimeout(resolve, status.waitMs));
+        } else {
+          throw new Error(status.reason || "Rate limit exceeded");
+        }
+      }
+      rateLimiter.recordCall("generateText");
+    }
+
     const { text } = await generateText({
       model: this.model,
       prompt,
@@ -66,6 +84,20 @@ class LLMClientImpl implements LLMClient {
     schema: T,
     system?: string
   ): Promise<z.infer<T>> {
+    // Check rate limit
+    const rateLimiter = getRateLimiter();
+    if (rateLimiter) {
+      const status = rateLimiter.canMakeCall();
+      if (!status.allowed) {
+        if (status.waitMs && status.waitMs < 30000) {
+          await new Promise((resolve) => setTimeout(resolve, status.waitMs));
+        } else {
+          throw new Error(status.reason || "Rate limit exceeded");
+        }
+      }
+      rateLimiter.recordCall("generateObject");
+    }
+
     const { object } = await generateObject({
       model: this.model,
       prompt,
@@ -74,6 +106,28 @@ class LLMClientImpl implements LLMClient {
       temperature: 0.7,
     });
     return object;
+  }
+
+  // Generate JSON without schema validation (fallback for providers that don't support structured output)
+  async generateJSON<T>(prompt: string, system?: string): Promise<T> {
+    const enhancedPrompt = `${prompt}
+
+Respond with a valid JSON object. Do not include markdown formatting or code blocks. Only output the raw JSON.`;
+
+    const text = await this.generateText(enhancedPrompt, system);
+
+    // Try to extract JSON from the response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0]) as T;
+      } catch (e) {
+        console.error("[LLM] Failed to parse JSON:", e, "Text:", text);
+        throw new Error("Failed to parse JSON response");
+      }
+    }
+
+    throw new Error("No JSON found in response");
   }
 }
 
@@ -94,4 +148,10 @@ export function getLLMClient(): LLMClient {
 
 export function isLLMInitialized(): boolean {
   return globalClient !== null;
+}
+
+// Switch to a different model config
+export function switchLLM(config: LLMConfig): LLMClient {
+  globalClient = new LLMClientImpl(config);
+  return globalClient;
 }

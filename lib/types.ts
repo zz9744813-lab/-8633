@@ -91,7 +91,6 @@ export type Building = {
   width: number;
   height: number;
   ownerId?: string;
-  size?: { width: number; height: number };
   description?: string;
 };
 

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AgentIdentity, AgentState, Position, Memory, Action } from "@/lib/types";
+import { EraPack } from "@/lib/era-pack/loader";
 import { getLLMClient } from "@/lib/llm/client";
 
 // Perception: What an agent observes
@@ -37,10 +38,17 @@ export class Agent {
   state: AgentState;
   plan: Plan | null = null;
   memories: Memory[] = [];
+  eraPack: EraPack | null = null;
 
-  constructor(id: string, identity: AgentIdentity, initialPosition: Position) {
+  constructor(
+    id: string,
+    identity: AgentIdentity,
+    initialPosition: Position,
+    eraPack: EraPack | null = null
+  ) {
     this.id = id;
     this.identity = identity;
+    this.eraPack = eraPack;
     this.state = {
       position: initialPosition,
       status: "idle",
@@ -101,10 +109,27 @@ export class Agent {
   async planAction(perception: Perception): Promise<Action> {
     const llm = getLLMClient();
 
-    const systemPrompt = `You are ${this.identity.name}, a ${this.identity.age}-year-old ${this.identity.occupation}.
-Personality traits: ${this.identity.personality.traits.join(", ")}
-Values: ${this.identity.personality.values.join(", ")}
-Current energy: ${this.state.energy}, mood: ${this.state.mood}, stress: ${this.state.stress}
+    // Build era-aware system prompt
+    let systemPrompt = "";
+
+    if (this.eraPack) {
+      systemPrompt = `${this.eraPack.worldPrompt}
+
+【对话风格约束】
+${this.eraPack.dialogueStyle}
+
+【绝对禁止提及】
+${this.eraPack.forbiddenConcepts.join("、")}
+
+`;
+    }
+
+    systemPrompt += `你是 ${this.identity.name}，${this.identity.age} 岁的${this.identity.occupation}。
+性格：${this.identity.personality.traits.join("、")}
+价值观：${this.identity.personality.values.join("、")}
+背景：${this.identity.backstory ?? ""}
+
+[当前状态] energy: ${this.state.energy}, mood: ${this.state.mood}, stress: ${this.state.stress}
 
 Respond with a valid JSON object with these fields:
 - action: "move" | "interact" | "talk" | "rest" | "work"
@@ -146,18 +171,27 @@ What do you want to do next?`;
   }
 
   // Execute phase: Perform the action
-  execute(action: Action, world: {
-    width: number;
-    height: number;
-    getPosition: (id: string) => Position | undefined;
-  }): void {
+  execute(
+    action: Action,
+    world: {
+      width: number;
+      height: number;
+      getPosition: (id: string) => Position | undefined;
+    }
+  ): void {
     switch (action.type) {
       case "move": {
         // Move randomly
         const dx = (Math.random() - 0.5) * 20;
         const dy = (Math.random() - 0.5) * 20;
-        this.state.position.x = Math.max(10, Math.min(world.width - 10, this.state.position.x + dx));
-        this.state.position.y = Math.max(10, Math.min(world.height - 10, this.state.position.y + dy));
+        this.state.position.x = Math.max(
+          10,
+          Math.min(world.width - 10, this.state.position.x + dx)
+        );
+        this.state.position.y = Math.max(
+          10,
+          Math.min(world.height - 10, this.state.position.y + dy)
+        );
         this.state.currentActivity = "moving";
         this.state.energy = Math.max(0, this.state.energy - 1);
         break;

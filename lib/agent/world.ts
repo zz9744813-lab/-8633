@@ -1,5 +1,7 @@
 import { Agent } from "./agent";
+import { memoryManager } from "./memory";
 import { AgentIdentity, Building, Position } from "@/lib/types";
+import { EraPack } from "@/lib/era-pack/loader";
 
 // World simulation
 export class World {
@@ -10,6 +12,7 @@ export class World {
   tickCount: number = 0;
   paused: boolean = false;
   speed: number = 1;
+  eraPack: EraPack | null = null;
 
   agents: Map<string, Agent> = new Map();
   buildings: Building[] = [];
@@ -17,11 +20,18 @@ export class World {
   private tickInterval: NodeJS.Timeout | null = null;
   private onTickCallbacks: Array<(world: World) => void> = [];
 
-  constructor(id: string, name: string, width: number = 800, height: number = 600) {
+  constructor(
+    id: string,
+    name: string,
+    width: number = 800,
+    height: number = 600,
+    eraPack: EraPack | null = null
+  ) {
     this.id = id;
     this.name = name;
     this.width = width;
     this.height = height;
+    this.eraPack = eraPack;
   }
 
   addAgent(id: string, identity: AgentIdentity, position?: Position): Agent {
@@ -29,7 +39,7 @@ export class World {
       x: Math.random() * (this.width - 20) + 10,
       y: Math.random() * (this.height - 20) + 10,
     };
-    const agent = new Agent(id, identity, pos);
+    const agent = new Agent(id, identity, pos, this.eraPack);
     this.agents.set(id, agent);
     return agent;
   }
@@ -70,6 +80,19 @@ export class World {
     // Each agent perceives, plans, and executes
     for (const agent of this.agents.values()) {
       const perception = agent.perceive(worldState);
+
+      // Write observation memories for nearby agents
+      for (const nearby of perception.nearbyAgents) {
+        await memoryManager.addMemory({
+          agentId: agent.id,
+          type: "observation",
+          content: `看见 ${nearby.name} 在 ${nearby.activity}`,
+          importance: 0.3,
+          tick: this.tickCount,
+          relatedAgentIds: [nearby.agentId],
+        });
+      }
+
       const action = await agent.planAction(perception);
       agent.execute(action, {
         width: this.width,
@@ -78,6 +101,15 @@ export class World {
           const a = this.agents.get(id);
           return a?.state.position;
         },
+      });
+
+      // Write action memory
+      await memoryManager.addMemory({
+        agentId: agent.id,
+        type: "event",
+        content: action.description,
+        importance: 0.4,
+        tick: this.tickCount,
       });
     }
 

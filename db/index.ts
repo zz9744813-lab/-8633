@@ -18,13 +18,17 @@ sqlite.pragma("journal_mode = WAL");
 
 // Load sqlite-vec extension for vector search
 try {
-  // Dynamic import for sqlite-vec
-  const sqliteVec = require("sqlite-vec");
-  sqliteVec.load(sqlite);
-  console.log("[DB] sqlite-vec extension loaded");
+  // ESM import for sqlite-vec
+  import("sqlite-vec").then(sqliteVec => {
+    sqliteVec.load(sqlite);
+    console.log("[DB] sqlite-vec extension loaded");
+  }).catch(error => {
+    console.error("[DB] sqlite-vec FAILED:", error);
+    console.error("[DB] Vector search will not be available");
+  });
 } catch (error) {
-  console.warn("[DB] Failed to load sqlite-vec extension:", error);
-  console.warn("[DB] Vector search will not be available");
+  console.error("[DB] sqlite-vec FAILED:", error);
+  console.error("[DB] Vector search will not be available");
 }
 
 export const db = drizzle(sqlite, { schema });

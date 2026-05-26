@@ -86,7 +86,8 @@ export function ConfigPanel({ isOpen, onClose, onConfigChange }: ConfigPanelProp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: "新世界",
-          eraPack: "18th_england",
+          worldId: "default-world",
+          eraPackId: "18th_england",
           population: config.maxAgents,
         }),
       });

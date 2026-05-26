@@ -1,7 +1,9 @@
 import { Agent } from "./agent";
-import { memoryManager } from "./memory";
+import { memoryManager, reflectionEngine } from "./memory";
 import { AgentIdentity, Building, Position } from "@/lib/types";
 import { EraPack } from "@/lib/era-pack/loader";
+import { worldEventSystem } from "@/db/world-event-repository";
+import { worldRepository } from "@/db/world-repository";
 
 // World simulation
 export class World {
@@ -18,6 +20,7 @@ export class World {
   buildings: Building[] = [];
 
   private tickInterval: NodeJS.Timeout | null = null;
+  private running: boolean = false;
   private onTickCallbacks: Array<(world: World) => void> = [];
 
   constructor(
@@ -129,14 +132,28 @@ export class World {
         action = await agent.planAction(perception);
       }
 
-      agent.execute(action, {
+      // Execute action with buildings context
+      const completed = agent.execute(action, {
         width: this.width,
         height: this.height,
-        getPosition: (id: string) => {
-          const a = this.agents.get(id);
-          return a?.state.position;
-        },
+        buildings: this.buildings,
       });
+
+      // If action completed and it's a talking action, try dialogue
+      if (completed && action.type === "SAY" && action.targetId) {
+        const targetAgent = this.agents.get(action.targetId);
+        if (targetAgent) {
+          try {
+            await agent.talkTo(targetAgent, {
+              buildings: this.buildings,
+              currentTime: worldState.currentTime,
+              currentTick: this.tickCount,
+            });
+          } catch (e) {
+            console.error("[World] Dialogue failed:", e);
+          }
+        }
+      }
 
       // Write action memory
       await memoryManager.addMemory({
@@ -148,6 +165,92 @@ export class World {
       });
     }
 
+    // === W2: Dialogue triggering ===
+    const interactedPairs = new Set<string>();
+    for (const agent of this.agents.values()) {
+      if (agent.state.currentActivity === "talking") continue;
+      for (const [otherId, other] of this.agents) {
+        if (otherId === agent.id) continue;
+        const pairKey = [agent.id, otherId].sort().join("-");
+        if (interactedPairs.has(pairKey)) continue;
+
+        const dist = Math.hypot(
+          agent.state.position.x - other.state.position.x,
+          agent.state.position.y - other.state.position.y
+        );
+        if (dist > 25) continue;
+
+        // 30 ticks 内说过话就别再触发
+        const recentMemories = await memoryManager.getSTM(agent.id, this.tickCount, 10);
+        const lastTalk = recentMemories.find(m =>
+          m.type === "dialogue" && m.content.includes(other.identity.name)
+        );
+        if (lastTalk && this.tickCount - lastTalk.tick < 30) continue;
+
+        // 50% 概率搭话
+        if (Math.random() > 0.5) continue;
+
+        interactedPairs.add(pairKey);
+        try {
+          await agent.talkTo(other, {
+            buildings: this.buildings,
+            currentTime: worldState.currentTime,
+            currentTick: this.tickCount,
+          });
+        } catch (e) {
+          console.error("[World] Dialogue failed:", e);
+        }
+        break; // 一个 agent 一个 tick 最多说一段
+      }
+    }
+
+    // === W3: Auto reflection (每个 agent 一天一次，22:00 触发) ===
+    if (hour === 22 && minute === 0) {
+      for (const agent of this.agents.values()) {
+        if (this.tickCount - (agent.lastReflectionTick ?? 0) >= 100) {
+          try {
+            await reflectionEngine.reflect(agent.id, agent.state, this.tickCount);
+            agent.lastReflectionTick = this.tickCount;
+          } catch (e) {
+            console.error("[World] Reflection failed:", e);
+          }
+        }
+      }
+    }
+
+    // === W4: World events (每 100 ticks 触发一次) ===
+    if (this.tickCount % 100 === 0 && this.tickCount > 0) {
+      const event = await worldEventSystem.generateRandomEvent(
+        this.id,
+        this.tickCount,
+        Array.from(this.agents.keys()),
+        this.eraPack
+      );
+
+      // 把目击者写入 memory
+      if (event) {
+        for (const witnessId of event.witnessIds) {
+          await memoryManager.addMemory({
+            agentId: witnessId,
+            type: "observation",
+            content: `目击了世界事件：${event.description}`,
+            importance: event.type === "disaster" ? 0.9 : event.type === "festival" ? 0.7 : 0.5,
+            tick: this.tickCount,
+          });
+        }
+      }
+    }
+
+    // === W6: Auto save (每 50 ticks) ===
+    if (this.tickCount % 50 === 0 && this.tickCount > 0) {
+      try {
+        await worldRepository.saveWorld(this);
+        console.log(`[World] Saved at tick ${this.tickCount}`);
+      } catch (e) {
+        console.error("[World] Save failed:", e);
+      }
+    }
+
     this.tickCount++;
 
     // Notify listeners
@@ -157,19 +260,26 @@ export class World {
   }
 
   start(): void {
-    if (this.tickInterval) return;
-
-    const intervalMs = 1000 / this.speed;
-    this.tickInterval = setInterval(() => {
-      this.step();
-    }, intervalMs);
+    if (this.running) return;
+    this.running = true;
+    const loop = async () => {
+      while (this.running) {
+        const start = performance.now();
+        try {
+          await this.step();
+        } catch (e) {
+          console.error("[World] Step failed:", e);
+        }
+        const elapsed = performance.now() - start;
+        const wait = Math.max(0, (1000 / this.speed) - elapsed);
+        await new Promise(r => setTimeout(r, wait));
+      }
+    };
+    loop();
   }
 
   stop(): void {
-    if (this.tickInterval) {
-      clearInterval(this.tickInterval);
-      this.tickInterval = null;
-    }
+    this.running = false;
   }
 
   setSpeed(speed: number): void {

@@ -36,6 +36,8 @@ export type AgentState = {
   mood: number;
   stress: number;
   status: AgentStatus;
+  targetPosition?: Position | null;
+  insideBuildingId?: string | null;
 };
 
 // ============ Time Types ============
@@ -137,10 +139,20 @@ export type SimulationConfig = {
 
 // ============ Agent Action Types ============
 
-export type ActionType = "move" | "interact" | "talk" | "rest" | "work";
+export type ActionType =
+  | "MOVE_TO"
+  | "ENTER"
+  | "WORK"
+  | "EAT"
+  | "SLEEP"
+  | "INTERACT"
+  | "USE"
+  | "WAIT"
+  | "SAY";
 
 export type Action = {
   type: ActionType;
   targetId?: string;
   description: string;
+  reason?: string;
 };

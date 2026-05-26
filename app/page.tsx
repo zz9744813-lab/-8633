@@ -282,6 +282,33 @@ export default function Home() {
                   <span>({selectedAgent.x.toFixed(0)}, {selectedAgent.y.toFixed(0)})</span>
                 </div>
               </div>
+
+              {/* Daily Plan Display */}
+              {selectedAgent.dailyPlan && (
+                <div className="mt-4 border-t pt-3">
+                  <div className="text-xs font-bold mb-2 text-muted-foreground">
+                    今日计划：{selectedAgent.dailyPlan.morningThought}
+                  </div>
+                  <div className="space-y-1">
+                    {selectedAgent.dailyPlan.steps.map((step, i) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          "text-xs py-1 px-2 rounded",
+                          i === selectedAgent.dailyPlan?.currentStepIdx
+                            ? "bg-yellow-100 border-l-2 border-yellow-500"
+                            : i < (selectedAgent.dailyPlan?.currentStepIdx ?? 0)
+                              ? "text-muted-foreground opacity-60"
+                              : ""
+                        )}
+                      >
+                        <span className="font-mono">{step.time}</span> {step.description}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <button
                 onClick={() => setIsMemoryOpen(true)}
                 className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-md text-sm font-medium transition-colors"

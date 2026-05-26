@@ -25,47 +25,23 @@ export async function POST(request: NextRequest) {
     // Create new world with era pack
     const world = createWorld(`world-${Date.now()}`, name, width, height, eraPack);
 
-    // Add default buildings from era pack
-    const defaultBuildings: Building[] = [
-      {
-        id: "tavern",
-        name: "酒馆",
-        type: "social",
-        position: { x: 200, y: 150 },
+    // Add buildings from era pack
+    const buildings: Building[] = eraPack.buildingTypes.map((bt, i) => {
+      // Simple grid layout
+      const col = i % 4;
+      const row = Math.floor(i / 4);
+      return {
+        id: bt.id,
+        name: bt.name,
+        type: bt.type as any,
+        position: { x: 100 + col * 180, y: 100 + row * 200 },
         width: 60,
-        height: 50,
-        description: "镇上的社交中心",
-      },
-      {
-        id: "market",
-        name: "集市",
-        type: "commercial",
-        position: { x: 500, y: 200 },
-        width: 80,
         height: 60,
-        description: "买卖商品的地方",
-      },
-      {
-        id: "church",
-        name: "教堂",
-        type: "religious",
-        position: { x: 350, y: 400 },
-        width: 50,
-        height: 70,
-        description: "祈祷和礼拜的场所",
-      },
-      {
-        id: "blacksmith",
-        name: "铁匠铺",
-        type: "crafting",
-        position: { x: 600, y: 400 },
-        width: 50,
-        height: 40,
-        description: "锻造工具和武器",
-      },
-    ];
+        description: bt.visual ?? "",
+      };
+    });
 
-    for (const building of defaultBuildings) {
+    for (const building of buildings) {
       world.addBuilding(building);
     }
 

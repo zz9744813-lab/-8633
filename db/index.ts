@@ -14,11 +14,13 @@ if (!fs.existsSync(DB_DIR)) {
 }
 
 const sqlite = new Database(DB_PATH);
+sqlite.pragma("journal_mode = WAL");
 
 // Load sqlite-vec extension for vector search
 try {
-  // @ts-ignore - sqlite-vec is a native extension
-  sqlite.loadExtension("sqlite-vec");
+  // Dynamic import for sqlite-vec
+  const sqliteVec = require("sqlite-vec");
+  sqliteVec.load(sqlite);
   console.log("[DB] sqlite-vec extension loaded");
 } catch (error) {
   console.warn("[DB] Failed to load sqlite-vec extension:", error);

@@ -54,6 +54,7 @@ export class Agent {
   // Daily planning
   dailyPlan: DailyPlan | null = null;
   lastPlanTick: number = 0;
+  lastReflectionTick?: number;
 
   constructor(
     id: string,
@@ -193,7 +194,7 @@ ${relevantMemories.length > 0
   // Get current action from plan based on time
   getCurrentActionFromPlan(currentHour: number, currentMinute: number): Action {
     if (!this.dailyPlan || this.dailyPlan.steps.length === 0) {
-      return { type: "move", description: "四处闲逛" };
+      return { type: "WAIT", description: "四处闲逛", reason: "无计划" };
     }
 
     const currentTime = currentHour * 60 + currentMinute;
@@ -213,23 +214,12 @@ ${relevantMemories.length > 0
       }
     }
 
-    // Map plan action to Action type
-    const actionTypeMap: Record<string, Action["type"]> = {
-      MOVE_TO: "move",
-      ENTER: "interact",
-      WORK: "work",
-      EAT: "rest",
-      SLEEP: "rest",
-      INTERACT: "talk",
-      USE: "interact",
-      WAIT: "move",
-      SAY: "talk",
-    };
-
+    // Return action with original plan type (no mapping)
     return {
-      type: actionTypeMap[currentStep.action] || "move",
+      type: currentStep.action,
       targetId: currentStep.target,
       description: currentStep.description,
+      reason: currentStep.reason,
     };
   }
 
@@ -357,42 +347,85 @@ What do you want to do next?`;
     world: {
       width: number;
       height: number;
-      getPosition: (id: string) => Position | undefined;
-    }
-  ): void {
+      buildings: Array<{ id: string; name: string; type: string; position: Position; width: number; height: number }>;
+    },
+    dt: number = 1
+  ): boolean {
     switch (action.type) {
-      case "move": {
-        const dx = (Math.random() - 0.5) * 20;
-        const dy = (Math.random() - 0.5) * 20;
-        this.state.position.x = Math.max(
-          10,
-          Math.min(world.width - 10, this.state.position.x + dx)
-        );
-        this.state.position.y = Math.max(
-          10,
-          Math.min(world.height - 10, this.state.position.y + dy)
-        );
-        this.state.currentActivity = "moving";
-        this.state.energy = Math.max(0, this.state.energy - 1);
-        break;
+      case "MOVE_TO": {
+        if (!action.targetId) {
+          this.state.currentActivity = "idle";
+          return true;
+        }
+
+        // Find target building
+        const building = world.buildings.find((b) => b.id === action.targetId);
+        if (!building) {
+          this.state.currentActivity = "idle";
+          return true;
+        }
+
+        // Set target position to building center
+        const targetPos: Position = {
+          x: building.position.x + building.width / 2,
+          y: building.position.y + building.height / 2,
+        };
+
+        // Move towards target
+        const arrived = moveTowards(this, targetPos, dt);
+        if (arrived) {
+          this.state.targetPosition = null;
+          this.state.currentActivity = "idle";
+          return true;
+        } else {
+          this.state.targetPosition = targetPos;
+          this.state.currentActivity = "moving_to_" + building.name;
+          return false;
+        }
       }
-      case "rest": {
-        this.state.currentActivity = "resting";
-        this.state.energy = Math.min(100, this.state.energy + 5);
-        this.state.stress = Math.max(0, this.state.stress - 2);
-        break;
+      case "ENTER": {
+        if (action.targetId) {
+          this.state.insideBuildingId = action.targetId;
+          const building = world.buildings.find((b) => b.id === action.targetId);
+          this.state.currentActivity = "inside_" + (building?.name || "building");
+        }
+        return true;
       }
-      case "work": {
+      case "WORK": {
         this.state.currentActivity = "working";
         this.state.energy = Math.max(0, this.state.energy - 2);
-        break;
+        return true;
       }
-      case "talk": {
+      case "EAT": {
+        this.state.currentActivity = "eating";
+        this.state.energy = Math.min(100, this.state.energy + 10);
+        return true;
+      }
+      case "SLEEP": {
+        this.state.currentActivity = "sleeping";
+        this.state.energy = Math.min(100, this.state.energy + 15);
+        this.state.stress = Math.max(0, this.state.stress - 5);
+        return true;
+      }
+      case "INTERACT": {
+        this.state.currentActivity = "interacting";
+        return true;
+      }
+      case "USE": {
+        this.state.currentActivity = "using";
+        return true;
+      }
+      case "WAIT": {
+        this.state.currentActivity = "waiting";
+        return true;
+      }
+      case "SAY": {
         this.state.currentActivity = "talking";
-        break;
+        return true;
       }
       default: {
         this.state.currentActivity = "idle";
+        return true;
       }
     }
   }
@@ -444,4 +477,20 @@ What do you want to do next?`;
   async getAllRelationships() {
     return await relationshipManager.getAgentRelationships(this.id);
   }
+}
+
+// Move agent towards target position
+function moveTowards(agent: Agent, target: Position, dt: number): boolean {
+  const dx = target.x - agent.state.position.x;
+  const dy = target.y - agent.state.position.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 2) {
+    agent.state.targetPosition = null;
+    return true; // arrived
+  }
+  const speed = 30; // pixels per tick
+  const step = Math.min(speed * dt, dist);
+  agent.state.position.x += (dx / dist) * step;
+  agent.state.position.y += (dy / dist) * step;
+  return false;
 }

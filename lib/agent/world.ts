@@ -48,6 +48,15 @@ export class World {
     this.buildings.push(building);
   }
 
+  // Get current game time from tick
+  getGameTime(): { hour: number; minute: number } {
+    const minutesPerTick = 10;
+    const totalMinutes = this.tickCount * minutesPerTick;
+    const hour = Math.floor(totalMinutes / 60) % 24;
+    const minute = totalMinutes % 60;
+    return { hour, minute };
+  }
+
   // Get world state for agent perception
   getWorldState() {
     const agentStates = new Map<string, { position: Position; currentActivity: string }>();
@@ -76,9 +85,27 @@ export class World {
     if (this.paused) return;
 
     const worldState = this.getWorldState();
+    const { hour, minute } = this.getGameTime();
 
-    // Each agent perceives, plans, and executes
+    // Each agent perceives, plans (if needed), and executes
     for (const agent of this.agents.values()) {
+      // Check if agent needs a new daily plan
+      if (agent.needsPlan(this.tickCount, hour)) {
+        // Stagger planning to avoid simultaneous LLM calls
+        // Use agent.id hash to determine offset
+        const agentHash = agent.id.split("").reduce((a, b) => a + b.charCodeAt(0), 0);
+        const staggerOffset = agentHash % 30; // 0-30 minutes stagger
+        const currentMinutes = hour * 60 + minute;
+
+        // Only plan if we've passed the stagger offset
+        if (currentMinutes % 30 >= staggerOffset || !agent.dailyPlan) {
+          await agent.generateDailyPlan(this.tickCount, {
+            buildings: this.buildings,
+            currentTime: worldState.currentTime,
+          });
+        }
+      }
+
       const perception = agent.perceive(worldState);
 
       // Write observation memories for nearby agents
@@ -93,7 +120,15 @@ export class World {
         });
       }
 
-      const action = await agent.planAction(perception);
+      // Get action from daily plan instead of calling LLM every tick
+      let action;
+      if (agent.dailyPlan && agent.dailyPlan.steps.length > 0) {
+        action = agent.getCurrentActionFromPlan(hour, minute);
+      } else {
+        // Fallback to LLM planning if no daily plan
+        action = await agent.planAction(perception);
+      }
+
       agent.execute(action, {
         width: this.width,
         height: this.height,
@@ -150,10 +185,7 @@ export class World {
   }
 
   private formatGameTime(): string {
-    const minutesPerTick = 10;
-    const totalMinutes = this.tickCount * minutesPerTick;
-    const hour = Math.floor(totalMinutes / 60) % 24;
-    const minute = totalMinutes % 60;
+    const { hour, minute } = this.getGameTime();
     return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
   }
 
@@ -169,6 +201,7 @@ export class World {
         id,
         identity: agent.identity,
         state: agent.state,
+        dailyPlan: agent.dailyPlan,
       })),
       buildings: this.buildings,
     };

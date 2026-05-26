@@ -23,12 +23,21 @@ export interface Perception {
   weather?: string;
 }
 
-// Plan: Agent's current plan
-export interface Plan {
-  goal: string;
-  steps: string[];
-  currentStep: number;
-  deadline?: number; // Tick deadline
+// Plan Step for daily planning
+export interface PlanStep {
+  time: string; // "HH:MM"
+  action: "MOVE_TO" | "ENTER" | "WORK" | "EAT" | "SLEEP" | "INTERACT" | "USE" | "WAIT" | "SAY";
+  target?: string; // building id / agent id / location key
+  description: string;
+  reason: string;
+}
+
+// Daily Plan
+export interface DailyPlan {
+  morningThought: string;
+  steps: PlanStep[];
+  currentStepIdx: number;
+  plannedAtTick: number;
 }
 
 // Agent instance
@@ -36,9 +45,12 @@ export class Agent {
   id: string;
   identity: AgentIdentity;
   state: AgentState;
-  plan: Plan | null = null;
   memories: Memory[] = [];
   eraPack: EraPack | null = null;
+
+  // Daily planning
+  dailyPlan: DailyPlan | null = null;
+  lastPlanTick: number = 0;
 
   constructor(
     id: string,
@@ -59,6 +71,153 @@ export class Agent {
     };
   }
 
+  // Check if agent needs a new daily plan
+  needsPlan(currentTick: number, currentHour: number): boolean {
+    // If no plan exists, need one
+    if (!this.dailyPlan) return true;
+
+    // If plan was made on a different day (assume 144 ticks = 1 day)
+    const dayLength = 144;
+    const currentDay = Math.floor(currentTick / dayLength);
+    const planDay = Math.floor(this.dailyPlan.plannedAtTick / dayLength);
+
+    if (currentDay !== planDay) return true;
+
+    // If it's morning (6:00) and we haven't planned today
+    if (currentHour >= 6 && this.dailyPlan.plannedAtTick < currentTick - 10) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Generate daily plan using LLM
+  async generateDailyPlan(currentTick: number, worldState: {
+    buildings: Array<{ id: string; name: string; type: string; position: Position }>;
+    currentTime: string;
+  }): Promise<DailyPlan> {
+    const llm = getLLMClient();
+
+    // Build era-aware system prompt
+    let systemPrompt = "";
+
+    if (this.eraPack) {
+      systemPrompt = `${this.eraPack.worldPrompt}
+
+【对话风格约束】
+${this.eraPack.dialogueStyle}
+
+【绝对禁止提及】
+${this.eraPack.forbiddenConcepts.join("、")}
+
+`;
+    }
+
+    systemPrompt += `你是 ${this.identity.name}，${this.identity.age} 岁的${this.identity.occupation}。
+性格：${this.identity.personality.traits.join("、")}
+价值观：${this.identity.personality.values.join("、")}
+背景：${this.identity.backstory ?? ""}
+
+[当前状态] energy: ${this.state.energy}, mood: ${this.state.mood}, stress: ${this.state.stress}
+
+请为今天制定一个日程计划。从早上6点到晚上10点，安排5-10个活动步骤。
+每个步骤包括：时间、行动类型、目标（可选）、描述、原因。
+
+可用建筑：${worldState.buildings.map((b) => `${b.name}(${b.id})`).join("、")}
+
+请返回 JSON 格式：`;
+
+    const PlanSchema = z.object({
+      morningThought: z.string(),
+      steps: z.array(z.object({
+        time: z.string(), // "HH:MM"
+        action: z.enum(["MOVE_TO", "ENTER", "WORK", "EAT", "SLEEP", "INTERACT", "USE", "WAIT", "SAY"]),
+        target: z.string().optional(),
+        description: z.string(),
+        reason: z.string(),
+      })).min(5).max(10),
+    });
+
+    try {
+      const response = await llm.generateObject(
+        `当前时间：${worldState.currentTime}\n请制定今天的日程计划。`,
+        PlanSchema,
+        systemPrompt
+      );
+
+      this.dailyPlan = {
+        morningThought: response.morningThought,
+        steps: response.steps,
+        currentStepIdx: 0,
+        plannedAtTick: currentTick,
+      };
+
+      this.lastPlanTick = currentTick;
+
+      return this.dailyPlan;
+    } catch (error) {
+      console.error("Failed to generate daily plan:", error);
+
+      // Fallback to basic plan
+      this.dailyPlan = {
+        morningThought: "今天又是普通的一天。",
+        steps: [
+          { time: "06:00", action: "WORK", description: "开始工作", reason: "维持生计" },
+          { time: "12:00", action: "EAT", description: "吃午饭", reason: "补充能量" },
+          { time: "18:00", action: "WORK", description: "继续工作", reason: "完成任务" },
+          { time: "22:00", action: "SLEEP", description: "睡觉休息", reason: "恢复精力" },
+        ],
+        currentStepIdx: 0,
+        plannedAtTick: currentTick,
+      };
+
+      return this.dailyPlan;
+    }
+  }
+
+  // Get current action from plan based on time
+  getCurrentActionFromPlan(currentHour: number, currentMinute: number): Action {
+    if (!this.dailyPlan || this.dailyPlan.steps.length === 0) {
+      return { type: "move", description: "四处闲逛" };
+    }
+
+    const currentTime = currentHour * 60 + currentMinute;
+
+    // Find the current step based on time
+    let currentStep = this.dailyPlan.steps[0];
+    for (let i = 0; i < this.dailyPlan.steps.length; i++) {
+      const step = this.dailyPlan.steps[i];
+      const [stepHour, stepMin] = step.time.split(":").map(Number);
+      const stepTime = stepHour * 60 + stepMin;
+
+      if (stepTime <= currentTime) {
+        currentStep = step;
+        this.dailyPlan.currentStepIdx = i;
+      } else {
+        break;
+      }
+    }
+
+    // Map plan action to Action type
+    const actionTypeMap: Record<string, Action["type"]> = {
+      MOVE_TO: "move",
+      ENTER: "interact",
+      WORK: "work",
+      EAT: "rest",
+      SLEEP: "rest",
+      INTERACT: "talk",
+      USE: "interact",
+      WAIT: "move",
+      SAY: "talk",
+    };
+
+    return {
+      type: actionTypeMap[currentStep.action] || "move",
+      targetId: currentStep.target,
+      description: currentStep.description,
+    };
+  }
+
   // Perception phase: Observe the environment
   perceive(worldState: {
     agents: Map<string, AgentState>;
@@ -76,7 +235,7 @@ export class Agent {
       if (distance <= 50) {
         nearbyAgents.push({
           agentId,
-          name: "Unknown", // Will be filled by caller
+          name: "Unknown",
           distance,
           activity: agentState.currentActivity,
         });
@@ -109,7 +268,6 @@ export class Agent {
   async planAction(perception: Perception): Promise<Action> {
     const llm = getLLMClient();
 
-    // Build era-aware system prompt
     let systemPrompt = "";
 
     if (this.eraPack) {
@@ -162,7 +320,6 @@ What do you want to do next?`;
         description: response.description,
       };
     } catch (error) {
-      // Fallback to random move if LLM fails
       return {
         type: "move",
         description: "Wandering around",
@@ -181,7 +338,6 @@ What do you want to do next?`;
   ): void {
     switch (action.type) {
       case "move": {
-        // Move randomly
         const dx = (Math.random() - 0.5) * 20;
         const dy = (Math.random() - 0.5) * 20;
         this.state.position.x = Math.max(

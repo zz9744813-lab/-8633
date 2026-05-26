@@ -216,3 +216,47 @@ export function getCachedSprite(key: string, generator: () => string): string {
 export function clearSpriteCache(): void {
   spriteCache.clear();
 }
+
+// I1: Generate AI portrait via fal.ai
+export async function generatePortrait(
+  name: string,
+  occupation: string,
+  gender: string,
+  apiKey: string,
+  eraName?: string
+): Promise<string | null> {
+  if (!apiKey) return null;
+
+  const prompt = `pixel art portrait, head and shoulders, retro game character, 
+${occupation}, ${gender}, named ${name},
+${eraName ? eraName + " era" : "fantasy setting"},
+limited palette, sharp pixels, simple background,
+no text, no logo, game sprite style`;
+
+  try {
+    const response = await fetch("https://fal.run/fal-ai/flux/schnell", {
+      method: "POST",
+      headers: {
+        "Authorization": `Key ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt,
+        image_size: "square_hd",
+        num_inference_steps: 4,
+        num_images: 1,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn("[Portrait] fal.ai API error:", response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return data?.images?.[0]?.url ?? null;
+  } catch (e) {
+    console.warn("[Portrait] fal.ai API failed:", e);
+    return null;
+  }
+}

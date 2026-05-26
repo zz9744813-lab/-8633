@@ -562,6 +562,20 @@ export function ConfigPanel({ isOpen, onClose, onConfigChange }: ConfigPanelProp
                 />
               </div>
 
+              {/* I1: fal.ai API Key */}
+              <div className="pt-4 border-t">
+                <label className="block text-sm font-medium mb-2">
+                  fal.ai API Key <span className="text-xs text-muted-foreground">(用于AI肖像生成)</span>
+                </label>
+                <input
+                  type="password"
+                  placeholder="输入 fal.ai API Key"
+                  value={config.falApiKey ?? ""}
+                  onChange={(e) => updateConfig({ falApiKey: e.target.value })}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono"
+                />
+              </div>
+
               <div className="pt-4 border-t space-y-2">
                 <h4 className="font-medium text-sm">导入/导出配置</h4>
                 <div className="flex gap-2">

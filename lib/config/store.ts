@@ -32,6 +32,9 @@ export interface AppConfig {
   enableDialogue: boolean;
   enableWorldEvents: boolean;
 
+  // I1: AI Portraits
+  falApiKey?: string;
+
   // Rate Limiting
   maxLLMCallsPerMinute: number;
   enableRateLimiting: boolean;
@@ -79,6 +82,8 @@ const DEFAULT_CONFIG: AppConfig = {
 
   maxLLMCallsPerMinute: 30,
   enableRateLimiting: true,
+
+  falApiKey: "",
 };
 
 // Storage key

@@ -77,7 +77,11 @@ export type BuildingType =
   | "shop"
   | "school"
   | "church"
-  | "clinic";
+  | "clinic"
+  | "social"
+  | "commercial"
+  | "religious"
+  | "crafting";
 
 export type Building = {
   id: string;
@@ -87,6 +91,8 @@ export type Building = {
   width: number;
   height: number;
   ownerId?: string;
+  size?: { width: number; height: number };
+  description?: string;
 };
 
 // ============ Era Pack Types ============
@@ -128,4 +134,14 @@ export type SimulationConfig = {
   tickRateHz: number;
   gameMinutesPerTick: number;
   speed: GameSpeed;
+};
+
+// ============ Agent Action Types ============
+
+export type ActionType = "move" | "interact" | "talk" | "rest" | "work";
+
+export type Action = {
+  type: ActionType;
+  targetId?: string;
+  description: string;
 };

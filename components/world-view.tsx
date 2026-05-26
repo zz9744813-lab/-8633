@@ -7,26 +7,31 @@ interface WorldViewProps {
   width?: number;
   height?: number;
   tileSize?: number;
+  agents?: Array<{ x: number; y: number; name: string }>;
+  buildings?: Array<{ x: number; y: number; name: string }>;
+  onAgentClick?: (agent: { x: number; y: number; name: string }) => void;
 }
 
-// Mock agents and buildings for Phase 1
-const MOCK_AGENTS = [
-  { id: "1", name: "张三", x: 10, y: 15, color: 0xff6b6b },
-  { id: "2", name: "李四", x: 25, y: 20, color: 0x4ecdc4 },
-  { id: "3", name: "王五", x: 35, y: 10, color: 0x45b7d1 },
+const DEFAULT_BUILDINGS = [
+  { id: "tavern", name: "酒馆", x: 200, y: 150, w: 60, h: 50, color: 0x8b4513 },
+  { id: "market", name: "集市", x: 500, y: 200, w: 80, h: 60, color: 0xd4a574 },
+  { id: "church", name: "教堂", x: 350, y: 400, w: 50, h: 70, color: 0x808080 },
+  { id: "blacksmith", name: "铁匠铺", x: 600, y: 400, w: 50, h: 40, color: 0x4a4a4a },
 ];
 
-const MOCK_BUILDINGS = [
-  { id: "b1", name: "酒馆", x: 20, y: 12, w: 4, h: 3, color: 0x8b4513 },
-  { id: "b2", name: "铁匠铺", x: 8, y: 8, w: 3, h: 3, color: 0x696969 },
-  { id: "b3", name: "民居", x: 30, y: 18, w: 3, h: 2, color: 0xdeb887 },
-  { id: "b4", name: "市集", x: 15, y: 25, w: 5, h: 4, color: 0xdaa520 },
-];
+const AGENT_COLORS = [0xff6b6b, 0x4ecdc4, 0x45b7d1, 0xf7dc6f, 0xbb8fce];
 
-export function WorldView({ width = 800, height = 600, tileSize = 10 }: WorldViewProps) {
+export function WorldView({
+  width = 800,
+  height = 600,
+  tileSize = 10,
+  agents = [],
+  onAgentClick,
+}: WorldViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   const agentsContainerRef = useRef<PIXI.Container | null>(null);
+  const agentSpritesRef = useRef<Map<string, PIXI.Container>>(new Map());
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -35,7 +40,7 @@ export function WorldView({ width = 800, height = 600, tileSize = 10 }: WorldVie
     const app = new PIXI.Application({
       width,
       height,
-      backgroundColor: 0x2d5016, // Dark green grass
+      backgroundColor: 0x2d5016,
       antialias: false,
       resolution: window.devicePixelRatio || 1,
     });
@@ -43,11 +48,10 @@ export function WorldView({ width = 800, height = 600, tileSize = 10 }: WorldVie
     containerRef.current.appendChild(app.view as HTMLCanvasElement);
     appRef.current = app;
 
-    // Create ground texture (simple grass pattern)
+    // Create ground texture
     const ground = new PIXI.Graphics();
     for (let x = 0; x < width; x += tileSize) {
       for (let y = 0; y < height; y += tileSize) {
-        // Slight color variation for grass
         const variation = Math.random() * 0x101010;
         const color = 0x2d5016 + variation;
         ground.beginFill(color);
@@ -59,23 +63,26 @@ export function WorldView({ width = 800, height = 600, tileSize = 10 }: WorldVie
 
     // Create buildings
     const buildingsContainer = new PIXI.Container();
-    MOCK_BUILDINGS.forEach((building) => {
+    DEFAULT_BUILDINGS.forEach((building) => {
       const g = new PIXI.Graphics();
       g.beginFill(building.color);
-      g.drawRect(building.x * tileSize, building.y * tileSize, building.w * tileSize, building.h * tileSize);
+      g.drawRect(building.x, building.y, building.w, building.h);
       g.endFill();
 
       // Add border
       g.lineStyle(2, 0x000000, 0.5);
-      g.drawRect(building.x * tileSize, building.y * tileSize, building.w * tileSize, building.h * tileSize);
+      g.drawRect(building.x, building.y, building.w, building.h);
 
       // Add label
       const text = new PIXI.Text(building.name, {
-        fontSize: 10,
+        fontSize: 12,
         fill: 0xffffff,
         fontFamily: "sans-serif",
+        stroke: 0x000000,
+        strokeThickness: 3,
       });
-      text.position.set(building.x * tileSize + 2, building.y * tileSize + building.h * tileSize / 2 - 5);
+      text.anchor.set(0.5);
+      text.position.set(building.x + building.w / 2, building.y + building.h / 2);
       g.addChild(text);
 
       buildingsContainer.addChild(g);
@@ -85,57 +92,7 @@ export function WorldView({ width = 800, height = 600, tileSize = 10 }: WorldVie
     // Create agents container
     const agentsContainer = new PIXI.Container();
     agentsContainerRef.current = agentsContainer;
-
-    MOCK_AGENTS.forEach((agent) => {
-      const g = new PIXI.Graphics();
-
-      // Draw agent as a circle
-      g.beginFill(agent.color);
-      g.drawCircle(0, 0, 6);
-      g.endFill();
-
-      // Add border
-      g.lineStyle(2, 0x000000, 0.7);
-      g.drawCircle(0, 0, 6);
-
-      // Add name label
-      const text = new PIXI.Text(agent.name, {
-        fontSize: 9,
-        fill: 0xffffff,
-        fontFamily: "sans-serif",
-        stroke: 0x000000,
-        strokeThickness: 2,
-      });
-      text.anchor.set(0.5, 1);
-      text.position.set(0, -10);
-      g.addChild(text);
-
-      g.position.set(agent.x * tileSize, agent.y * tileSize);
-      g.eventMode = "static";
-      g.cursor = "pointer";
-
-      agentsContainer.addChild(g);
-    });
-
     app.stage.addChild(agentsContainer);
-
-    // Simple animation loop - random movement
-    let tick = 0;
-    app.ticker.add(() => {
-      tick++;
-      if (tick % 60 === 0) {
-        // Every ~1 second, move agents randomly
-        agentsContainer.children.forEach((child, index) => {
-          const agent = MOCK_AGENTS[index];
-          if (agent) {
-            const dx = (Math.random() - 0.5) * 2;
-            const dy = (Math.random() - 0.5) * 2;
-            child.x = Math.max(10, Math.min(width - 10, child.x + dx * tileSize));
-            child.y = Math.max(10, Math.min(height - 10, child.y + dy * tileSize));
-          }
-        });
-      }
-    });
 
     return () => {
       app.destroy(true);
@@ -144,6 +101,71 @@ export function WorldView({ width = 800, height = 600, tileSize = 10 }: WorldVie
       }
     };
   }, [width, height, tileSize]);
+
+  // Update agents when data changes
+  useEffect(() => {
+    const container = agentsContainerRef.current;
+    if (!container) return;
+
+    const sprites = agentSpritesRef.current;
+
+    // Update or create agent sprites
+    agents.forEach((agent, index) => {
+      let sprite = sprites.get(agent.name);
+
+      if (!sprite) {
+        // Create new agent sprite
+        sprite = new PIXI.Container();
+
+        const g = new PIXI.Graphics();
+        const color = AGENT_COLORS[index % AGENT_COLORS.length];
+
+        // Draw agent as a circle
+        g.beginFill(color);
+        g.drawCircle(0, 0, 8);
+        g.endFill();
+
+        // Add border
+        g.lineStyle(2, 0x000000, 0.7);
+        g.drawCircle(0, 0, 8);
+
+        // Add name label
+        const text = new PIXI.Text(agent.name, {
+          fontSize: 10,
+          fill: 0xffffff,
+          fontFamily: "sans-serif",
+          stroke: 0x000000,
+          strokeThickness: 3,
+        });
+        text.anchor.set(0.5, 1);
+        text.position.set(0, -12);
+        sprite.addChild(g);
+        sprite.addChild(text);
+
+        // Make interactive
+        sprite.eventMode = "static";
+        sprite.cursor = "pointer";
+        sprite.on("pointerdown", () => {
+          onAgentClick?.(agent);
+        });
+
+        container.addChild(sprite);
+        sprites.set(agent.name, sprite);
+      }
+
+      // Update position
+      sprite.x = agent.x;
+      sprite.y = agent.y;
+    });
+
+    // Remove sprites for agents that no longer exist
+    sprites.forEach((sprite, name) => {
+      if (!agents.find((a) => a.name === name)) {
+        container.removeChild(sprite);
+        sprites.delete(name);
+      }
+    });
+  }, [agents, onAgentClick]);
 
   return (
     <div

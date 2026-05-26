@@ -26,6 +26,21 @@ interface WorldState {
   events: string[];
 }
 
+function formatGameTime(tick: number): string {
+  const minutesPerTick = 10;
+  const totalMinutes = tick * minutesPerTick;
+  const hour = Math.floor(totalMinutes / 60) % 24;
+  const minute = totalMinutes % 60;
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+}
+
+function getSeason(tick: number): string {
+  const ticksPerDay = 144;
+  const day = Math.floor(tick / ticksPerDay) % 360;
+  const seasonIndex = Math.floor(day / 90);
+  return ["春", "夏", "秋", "冬"][seasonIndex];
+}
+
 export default function Home() {
   // UI state
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -46,8 +61,7 @@ export default function Home() {
       eventSourceRef.current.close();
     }
 
-    const effectiveSpeed = isPaused ? 0 : speed;
-    const es = new EventSource(`/api/world/stream?speed=${effectiveSpeed}`);
+    const es = new EventSource("/api/sse");
 
     es.onopen = () => {
       setIsConnected(true);
@@ -56,8 +70,23 @@ export default function Home() {
     es.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        if (message.type === "init" || message.type === "update") {
-          setWorldState(message.data);
+        if (message.type === "init" || message.type === "tick") {
+          setWorldState({
+            tick: message.world.tick,
+            time: formatGameTime(message.world.tick),
+            date: `第 ${Math.floor(message.world.tick / 144) + 1} 年`,
+            season: getSeason(message.world.tick),
+            agents: message.world.agents.map((a: { id: string; identity: { name: string }; state: { position: { x: number; y: number }; currentActivity: string; mood: number; energy: number } }) => ({
+              id: a.id,
+              name: a.identity.name,
+              x: a.state.position.x,
+              y: a.state.position.y,
+              activity: a.state.currentActivity,
+              mood: a.state.mood,
+              energy: a.state.energy,
+            })),
+            events: [],
+          });
         }
       } catch (e) {
         console.error("Failed to parse SSE message:", e);
@@ -67,10 +96,12 @@ export default function Home() {
     es.onerror = () => {
       setIsConnected(false);
       es.close();
+      // Reconnect after 3 seconds
+      setTimeout(connect, 3000);
     };
 
     eventSourceRef.current = es;
-  }, [speed, isPaused]);
+  }, []);
 
   // Initial connection
   useEffect(() => {
@@ -80,17 +111,15 @@ export default function Home() {
     };
   }, [connect]);
 
-  // Reconnect when speed changes
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      connect();
-    }, 100);
-    return () => clearTimeout(timeout);
-  }, [speed, isPaused, connect]);
-
   // Handlers
   const handleSpeedChange = useCallback((newSpeed: GameSpeed) => {
     setSpeed(newSpeed);
+    // Send control command to server
+    fetch("/api/simulation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: newSpeed === 0 ? "pause" : "setSpeed", speed: newSpeed }),
+    });
     if (newSpeed === 0) {
       setIsPaused(true);
     } else {
@@ -99,21 +128,24 @@ export default function Home() {
   }, []);
 
   const handlePauseResume = useCallback(() => {
-    if (isPaused) {
-      setIsPaused(false);
-      setSpeed((prev) => (prev === 0 ? 1 : prev));
-    } else {
-      setIsPaused(true);
-      setSpeed(0);
-    }
+    const newPaused = !isPaused;
+    setIsPaused(newPaused);
+    fetch("/api/simulation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: newPaused ? "pause" : "resume" }),
+    });
   }, [isPaused]);
 
   const handleSkipToNext = useCallback(() => {
     // Skip to next hour (6 ticks)
     if (worldState) {
       const ticksToNext = 6 - (worldState.tick % 6);
-      // This would require a server call in real implementation
-      // For now, just visual feedback
+      fetch("/api/simulation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "tick", count: ticksToNext }),
+      });
     }
   }, [worldState]);
 
@@ -126,6 +158,13 @@ export default function Home() {
     { x: 400, y: 300, name: "居民1" },
     { x: 200, y: 400, name: "居民2" },
     { x: 600, y: 200, name: "居民3" },
+  ];
+
+  const buildingPositions = [
+    { x: 200, y: 150, name: "酒馆" },
+    { x: 500, y: 200, name: "集市" },
+    { x: 350, y: 400, name: "教堂" },
+    { x: 600, y: 400, name: "铁匠铺" },
   ];
 
   return (

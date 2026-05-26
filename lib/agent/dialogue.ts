@@ -6,6 +6,7 @@ import { AgentIdentity } from "@/lib/types";
 import { EraPack } from "@/lib/era-pack/loader";
 import { rumorEngine } from "./rumor-engine";
 import { World } from "./world";
+import { lintContent } from "@/lib/safety/lint";
 
 export interface DialogueContext {
   world: World;
@@ -82,6 +83,14 @@ Respond with JSON:
         relationshipImpact: number;
       }>(speakerPrompt, systemPrompt);
 
+      // H1: Lint speaker response
+      const speakerLint = lintContent(speakerResponse.text);
+      if (!speakerLint.passed) {
+        console.warn(`[H1] Dialogue speaker text rejected: ${speakerLint.reason}`);
+        speakerResponse.text = speakerLint.sanitized ?? "今天天气不错。";
+        speakerResponse.relationshipImpact = 0;
+      }
+
       // Generate listener response
       const listenerPrompt = `You are ${context.listener.identity.name}, ${context.listener.identity.age} years old, a ${context.listener.identity.occupation}.
 Character: ${context.listener.identity.personality.traits.join(", ")}
@@ -110,6 +119,14 @@ Respond with JSON:
         emotion: "friendly" | "neutral" | "hostile" | "excited" | "sad";
         relationshipImpact: number;
       }>(listenerPrompt, systemPrompt);
+
+      // H1: Lint listener response
+      const listenerLint = lintContent(listenerResponse.text);
+      if (!listenerLint.passed) {
+        console.warn(`[H1] Dialogue listener text rejected: ${listenerLint.reason}`);
+        listenerResponse.text = listenerLint.sanitized ?? "嗯，原来如此。";
+        listenerResponse.relationshipImpact = 0;
+      }
 
       // Record the conversation in memories
       await this.recordDialogue(context, speakerResponse.text, listenerResponse.text);
@@ -274,7 +291,12 @@ What's going through your mind right now? Respond with a brief internal thought 
 
     try {
       const thought = await llm.generateText(prompt, "You are generating an internal monologue. Be introspective and character-appropriate.");
-      return thought.trim();
+      const linted = lintContent(thought.trim());
+      if (!linted.passed) {
+        console.warn(`[H1] Monologue rejected: ${linted.reason}`);
+        return "今天真是普通的一天。";
+      }
+      return linted.sanitized ?? thought.trim();
     } catch (error) {
       console.error("[Dialogue] Failed to generate monologue:", error);
       return "I'm thinking about what to do next.";

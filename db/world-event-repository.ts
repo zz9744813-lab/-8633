@@ -2,6 +2,7 @@ import { db } from "./index";
 import { worldEvents } from "./schema";
 import { eq, desc } from "drizzle-orm";
 import { getLLMClient } from "@/lib/llm/client";
+import { lintContent } from "@/lib/safety/lint";
 
 export type WorldEventType = "weather" | "festival" | "disaster" | "intervention" | "news" | "illness";
 
@@ -131,6 +132,13 @@ Event should be something that the townspeople would notice and react to.`;
 
     try {
       const description = await llm.generateText(prompt, systemPrompt);
+
+      // H1: Lint event description
+      const eventLint = lintContent(description.trim());
+      if (!eventLint.passed) {
+        console.warn(`[H1] World event rejected: ${eventLint.reason}`);
+        return null;
+      }
 
       // Select random witnesses (30% of agents)
       const numWitnesses = Math.max(1, Math.floor(agentIds.length * 0.3));

@@ -4,6 +4,7 @@ import { Agent } from "./agent";
 import { World } from "./world";
 import { getLLMClient } from "@/lib/llm/client";
 import { z } from "zod";
+import { lintContent } from "@/lib/safety/lint";
 
 // Rumor engine for handling rumor creation and spread
 export class RumorEngine {
@@ -151,6 +152,16 @@ Rewrite this rumor as it might be told, with slight changes or exaggerations:`;
       });
 
       const result = await llm.generateObject(prompt, DistortionSchema, systemPrompt);
+
+      // H1: Lint distorted rumor
+      const rumorLint = lintContent(result.distortedContent);
+      if (!rumorLint.passed) {
+        console.warn(`[H1] Distorted rumor rejected: ${rumorLint.reason}`);
+        return {
+          content: originalContent,
+          level: 0.1,
+        };
+      }
 
       return {
         content: result.distortedContent,

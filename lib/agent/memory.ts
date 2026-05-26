@@ -9,6 +9,7 @@ import {
 import { vectorMemoryStore, VectorMemory } from "@/db/vector-memory";
 import { getLLMClient } from "@/lib/llm/client";
 import { z } from "zod";
+import { lintContent } from "@/lib/safety/lint";
 
 // In-memory cache for STM (Short-Term Memory)
 const stmCache: Map<string, Memory[]> = new Map();
@@ -234,6 +235,13 @@ What pattern or insight might this person have? Should their goals be updated?`;
       });
 
       const result = await llm.generateObject(prompt, ReflectionSchema, systemPrompt);
+
+      // H1: Lint reflection insight
+      const insightLint = lintContent(result.insight);
+      if (!insightLint.passed) {
+        console.warn(`[H1] Reflection insight rejected: ${insightLint.reason}`);
+        return null;
+      }
 
       const trimmedInsight = result.insight.trim();
 

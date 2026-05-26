@@ -5,6 +5,7 @@ import { memoryManager } from "./memory";
 import { worldEventSystem } from "@/db/world-event-repository";
 import { getLLMClient } from "@/lib/llm/client";
 import { z } from "zod";
+import { lintArray } from "@/lib/safety/lint";
 
 // Season mapping from tick
 function getSeasonFromTick(tick: number): string {
@@ -321,8 +322,17 @@ ${eventsText}
 
       const result = await llm.generateObject(prompt, DailySummarySchema, systemPrompt);
 
+      // H1: Lint chronicle entries
+      const safeEntries = lintArray(result.entries, {
+        onReject: (item, reason) => console.warn(`[H1] Chronicle entry rejected: ${reason}\n  "${item.substring(0, 50)}..."`),
+      });
+      if (safeEntries.length === 0) {
+        console.warn("[H1] All chronicle entries rejected, skipping daily summary");
+        return;
+      }
+
       // Combine entries into description
-      const description = result.entries.join("\n\n");
+      const description = safeEntries.join("\n\n");
 
       const { year, season, day } = this.getGameDate(world.tickCount);
 
@@ -338,7 +348,7 @@ ${eventsText}
         importance: 0.6,
         metadata: {
           dayNumber,
-          entryCount: result.entries.length,
+          entryCount: safeEntries.length,
         },
       });
 

@@ -5,6 +5,7 @@ import { getLLMClient } from "@/lib/llm/client";
 import { memoryManager } from "@/lib/agent/memory";
 import { dialogueSystem } from "@/lib/agent/dialogue";
 import { relationshipManager } from "@/db/relationship-repository";
+import { lintContent, lintArray } from "@/lib/safety/lint";
 
 // Perception: What an agent observes
 export interface Perception {
@@ -199,9 +200,29 @@ ${relevantMemories.length > 0
         systemPrompt
       );
 
+      // H1: Lint daily plan
+      const thoughtLint = lintContent(response.morningThought);
+      if (!thoughtLint.passed) {
+        console.warn(`[H1] Daily plan morningThought rejected: ${thoughtLint.reason}`);
+        response.morningThought = "又是新的一天。";
+      }
+      const safeSteps = response.steps.filter((step, i) => {
+        const descLint = lintContent(step.description);
+        const reasonLint = lintContent(step.reason);
+        if (!descLint.passed || !reasonLint.passed) {
+          console.warn(`[H1] Daily plan step ${i} rejected: ${descLint.reason || reasonLint.reason}`);
+          return false;
+        }
+        return true;
+      });
+      if (safeSteps.length < 3) {
+        console.warn("[H1] Too few safe daily plan steps, using fallback");
+        throw new Error("Too many rejected steps");
+      }
+
       this.dailyPlan = {
         morningThought: response.morningThought,
-        steps: response.steps,
+        steps: safeSteps,
         currentStepIdx: 0,
         plannedAtTick: currentTick,
       };
@@ -365,6 +386,14 @@ What do you want to do next?`;
         }),
         systemPrompt
       );
+
+      // H1: Lint plan action description
+      const actionDescLint = lintContent(response.description);
+      const actionReasonLint = lintContent(response.reason);
+      if (!actionDescLint.passed || !actionReasonLint.passed) {
+        console.warn(`[H1] planAction rejected: ${actionDescLint.reason || actionReasonLint.reason}`);
+        return { type: "WAIT", description: "四处闲逛", reason: "待定" };
+      }
 
       const actionMap: Record<string, ActionType> = {
         move: "MOVE_TO",

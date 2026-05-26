@@ -1,5 +1,12 @@
 import { create } from "zustand";
-import { Agent, Building } from "@/lib/types";
+import { Building } from "@/lib/types";
+
+interface AgentData {
+  id: string;
+  identity: { name: string; age: number; occupation: string };
+  state: { position: { x: number; y: number }; currentActivity: string; energy: number; mood: number };
+  dailyPlan?: { morningThought: string; steps: { time: string; description: string }[] } | null;
+}
 
 interface WorldState {
   id: string | null;
@@ -7,7 +14,7 @@ interface WorldState {
   tick: number;
   speed: number;
   paused: boolean;
-  agents: Agent[];
+  agents: AgentData[];
   buildings: Building[];
   connected: boolean;
 
@@ -17,7 +24,7 @@ interface WorldState {
     tick: number;
     speed: number;
     paused: boolean;
-    agents: Agent[];
+    agents: AgentData[];
     buildings: Building[];
   }) => void;
 
@@ -25,7 +32,7 @@ interface WorldState {
     tick: number;
     speed: number;
     paused: boolean;
-    agents: Agent[];
+    agents: AgentData[];
   }) => void;
 
   setConnected: (connected: boolean) => void;

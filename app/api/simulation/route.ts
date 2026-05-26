@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getWorld } from "@/lib/agent";
 import { initLLM } from "@/lib/llm/client";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/simulation/control - Control simulation
 export async function POST(request: NextRequest) {
   try {
@@ -42,7 +44,7 @@ export async function POST(request: NextRequest) {
         }
         break;
       case "tick":
-        await world.tick();
+        await (world as any).step();
         break;
       default:
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });

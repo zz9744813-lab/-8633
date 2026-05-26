@@ -3,6 +3,8 @@ import { createWorldOrLoad, getWorld, destroyWorld, setWorld } from "@/lib/agent
 import { loadEraPack, generateAgentIdentity } from "@/lib/era-pack/loader";
 import { AgentIdentity, Building } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/world - Create or load a world
 export async function POST(request: NextRequest) {
   try {

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getWorld } from "@/lib/agent";
 import { AgentIdentity } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/agents - List all agents
 export async function GET() {
   const world = getWorld();

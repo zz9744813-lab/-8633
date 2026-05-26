@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { chronicleRepo } from "@/db/chronicle-repository";
+import { chronicleRepo, ChronicleFilter } from "@/db/chronicle-repository";
+
+export const dynamic = "force-dynamic";
 
 // GET /api/chronicles?worldId=xxx&year=xxx
 export async function GET(request: NextRequest) {
@@ -18,18 +20,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const filter: {
-      worldId: string;
-      year?: number;
-      season?: string;
-      type?: string;
-      limit?: number;
-    } = { worldId };
-
-    if (year) filter.year = parseInt(year);
-    if (season) filter.season = season;
-    if (type) filter.type = type;
-    if (limit) filter.limit = parseInt(limit);
+    const filter: ChronicleFilter = {
+      worldId,
+      year: year ? parseInt(year) : undefined,
+      season: season || undefined,
+      type: (type as any) || undefined,
+      limit: limit ? parseInt(limit) : undefined,
+    };
 
     const chronicles = await chronicleRepo.list(filter);
     return NextResponse.json({ chronicles });

@@ -99,7 +99,7 @@ export class VectorMemoryStore {
 
       // Perform vector search with similarity
       // sqlite-vec uses distance (lower is better), convert to similarity (higher is better)
-      const results = await db.run(sql`
+      const rows: any[] = await db.all(sql`
         SELECT
           m.id as memory_id,
           m.agent_id,
@@ -115,9 +115,6 @@ export class VectorMemoryStore {
         ORDER BY e.distance ASC
         LIMIT ${limit}
       `);
-
-      // Parse results
-      const rows = results.rows || [];
       return rows
         .filter((row: any) => (1 - (row.distance / 2)) >= threshold)
         .map((row: any) => ({
@@ -172,7 +169,7 @@ export class VectorMemoryStore {
       const queryVecString = embeddingToSqliteVec(queryEmbedding);
 
       // Combined score: semanticWeight * similarity + (1 - semanticWeight) * importance
-      const results = await db.run(sql`
+      const rows: any[] = await db.all(sql`
         SELECT
           m.id as memory_id,
           m.agent_id,
@@ -189,8 +186,6 @@ export class VectorMemoryStore {
         ORDER BY combined_score DESC
         LIMIT ${limit}
       `);
-
-      const rows = results.rows || [];
       return rows.map((row: any) => ({
         memoryId: row.memory_id,
         agentId: row.agent_id,

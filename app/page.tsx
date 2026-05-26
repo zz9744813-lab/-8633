@@ -16,6 +16,7 @@ import { Settings, Activity, Brain } from "lucide-react";
 interface AgentState {
   id: string;
   name: string;
+  occupation: string;
   x: number;
   y: number;
   activity: string;
@@ -25,6 +26,8 @@ interface AgentState {
   status?: string;
   skills?: Record<string, number>;
   currentGoals?: string[];
+  isMoving?: boolean;
+  dir?: string;
   dailyPlan?: { morningThought: string; steps: { time: string; description: string }[]; currentStepIdx: number };
 }
 
@@ -105,6 +108,7 @@ export default function Home() {
             agents: message.world.agents.map((a: any) => ({
               id: a.id,
               name: a.identity.name,
+              occupation: a.identity.occupation,
               x: a.state.position.x,
               y: a.state.position.y,
               activity: a.state.currentActivity,
@@ -114,6 +118,8 @@ export default function Home() {
               status: a.state.status,
               skills: a.state.skills,
               currentGoals: a.state.currentGoals,
+              isMoving: a.state.isMoving,
+              dir: a.state.position.dir,
               dailyPlan: a.dailyPlan,
             })),
             events: [],
@@ -194,13 +200,18 @@ export default function Home() {
 
   // Agent positions for WorldView
   const agentPositions = worldState?.agents.map((a) => ({
+    id: a.id,
     x: a.x,
     y: a.y,
     name: a.name,
+    occupation: a.occupation,
+    currentActivity: a.activity,
+    isMoving: a.isMoving,
+    dir: a.dir,
   })) || [
-    { x: 400, y: 300, name: "居民1" },
-    { x: 200, y: 400, name: "居民2" },
-    { x: 600, y: 200, name: "居民3" },
+    { id: "1", x: 400, y: 300, name: "居民1", occupation: "无业", currentActivity: "idle" },
+    { id: "2", x: 200, y: 400, name: "居民2", occupation: "无业", currentActivity: "idle" },
+    { id: "3", x: 600, y: 200, name: "居民3", occupation: "无业", currentActivity: "idle" },
   ];
 
   const buildingPositions = [

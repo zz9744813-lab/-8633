@@ -203,6 +203,62 @@ export function generateBuildingSprite(type: string, name: string): string {
   return canvas.toDataURL("image/png");
 }
 
+// Generate a 4-frame walk animation spritesheet (64x24)
+export function generateWalkSheet(config: AgentSpriteConfig): string {
+  const frameCount = 4;
+  const canvas = document.createElement("canvas");
+  canvas.width = 16 * frameCount;
+  canvas.height = 24;
+  const ctx = canvas.getContext("2d")!;
+  const colors = generateColorsFromSeed(config.seed);
+  const isFemale = config.gender === "female";
+
+  for (let i = 0; i < frameCount; i++) {
+    const ox = i * 16;
+
+    // Leg offset for walk cycle
+    const legOffset = [0, 2, 0, -2][i];
+
+    // Legs
+    ctx.fillStyle = colors.pants;
+    ctx.fillRect(ox + 5 + legOffset, 16, 2, 8);
+    ctx.fillRect(ox + 9 - legOffset, 16, 2, 8);
+
+    // Body
+    ctx.fillStyle = colors.clothes;
+    ctx.fillRect(ox + 4, 10, 8, 8);
+
+    // Arms
+    const armSway = [0, 1, 0, -1][i];
+    ctx.fillStyle = colors.skin;
+    ctx.fillRect(ox + 2 + armSway, 11, 2, 5);
+    ctx.fillRect(ox + 12 - armSway, 11, 2, 5);
+
+    // Head
+    ctx.fillStyle = colors.skin;
+    ctx.fillRect(ox + 5, 4, 6, 6);
+
+    // Hair
+    ctx.fillStyle = colors.hair;
+    if (isFemale) {
+      ctx.fillRect(ox + 4, 2, 8, 3);
+      ctx.fillRect(ox + 3, 3, 2, 6);
+      ctx.fillRect(ox + 11, 3, 2, 6);
+    } else {
+      ctx.fillRect(ox + 4, 2, 8, 3);
+      ctx.fillRect(ox + 4, 3, 1, 3);
+      ctx.fillRect(ox + 11, 3, 1, 3);
+    }
+
+    // Eyes
+    ctx.fillStyle = "#000";
+    ctx.fillRect(ox + 6, 6, 1, 1);
+    ctx.fillRect(ox + 9, 6, 1, 1);
+  }
+
+  return canvas.toDataURL("image/png");
+}
+
 // Cache for generated sprites
 const spriteCache = new Map<string, string>();
 

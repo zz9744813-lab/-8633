@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AgentIdentity, AgentState, Position, Memory, Action } from "@/lib/types";
+import { AgentIdentity, AgentState, Position, Memory, Action, ActionType } from "@/lib/types";
 import { EraPack } from "@/lib/era-pack/loader";
 import { getLLMClient } from "@/lib/llm/client";
 import { memoryManager } from "@/lib/agent/memory";
@@ -161,7 +161,7 @@ ${this.state.skills && Object.keys(this.state.skills).length > 0
   : "暂无专业技能"}
 
 [长期目标]
-${this.state.currentGoals.length > 0
+${this.state.currentGoals && this.state.currentGoals.length > 0
   ? this.state.currentGoals.map((g, i) => `${i + 1}. ${g}`).join("\n")
   : "暂无明确长期目标"}
 
@@ -261,7 +261,7 @@ ${relevantMemories.length > 0
 
   // Perception phase: Observe the environment
   perceive(worldState: {
-    agents: Map<string, AgentState>;
+    agents: Map<string, { position: Position; currentActivity: string }>;
     buildings: Array<{ id: string; name: string; type: string; position: Position }>;
     currentTime: string;
     tick: number;
@@ -364,14 +364,22 @@ What do you want to do next?`;
         systemPrompt
       );
 
+      const actionMap: Record<string, ActionType> = {
+        move: "MOVE_TO",
+        interact: "INTERACT",
+        talk: "SAY",
+        rest: "WAIT",
+        work: "WORK",
+      };
+
       return {
-        type: response.action,
+        type: actionMap[response.action] || "WAIT",
         targetId: response.targetId,
         description: response.description,
       };
     } catch (error) {
       return {
-        type: "move",
+        type: "WAIT",
         description: "Wandering around",
       };
     }
@@ -415,10 +423,12 @@ What do you want to do next?`;
         if (arrived) {
           this.state.targetPosition = null;
           this.state.currentActivity = "idle";
+          this.state.isMoving = false;
           return true;
         } else {
           this.state.targetPosition = targetPos;
           this.state.currentActivity = "moving_to_" + building.name;
+          this.state.isMoving = true;
           return false;
         }
       }
@@ -498,7 +508,7 @@ What do you want to do next?`;
     });
 
     const result = await dialogueSystem.generateDialogue({
-      world,
+      world: world as any,
       speaker: this,
       listener: targetAgent,
       location: building?.name,
@@ -536,11 +546,22 @@ function moveTowards(agent: Agent, target: Position, dt: number): boolean {
   const dist = Math.hypot(dx, dy);
   if (dist < 2) {
     agent.state.targetPosition = null;
+    agent.state.isMoving = false;
     return true; // arrived
   }
+
+  // Set direction based on primary movement axis
+  const angle = Math.atan2(dy, dx);
+  if (Math.abs(dx) > Math.abs(dy)) {
+    agent.state.position.dir = dx > 0 ? "right" : "left";
+  } else {
+    agent.state.position.dir = dy > 0 ? "down" : "up";
+  }
+
   const speed = 30; // pixels per tick
   const step = Math.min(speed * dt, dist);
   agent.state.position.x += (dx / dist) * step;
   agent.state.position.y += (dy / dist) * step;
+  agent.state.isMoving = true;
   return false;
 }

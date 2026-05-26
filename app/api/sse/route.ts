@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { getWorld } from "@/lib/agent";
 
+export const dynamic = "force-dynamic";
+
 // SSE endpoint for real-time world updates
 export async function GET(request: NextRequest) {
   const world = getWorld();

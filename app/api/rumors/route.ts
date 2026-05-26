@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rumorRepo } from "@/db/rumor-repository";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/rumors?worldId=xxx&agentId=xxx
 export async function GET(request: NextRequest) {
   try {

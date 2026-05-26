@@ -12,10 +12,10 @@ export class RumorEngine {
 
   constructor(
     repo: RumorRepository = rumorRepo,
-    memoryManager: MemoryManager = memoryManager
+    mm?: MemoryManager
   ) {
     this.repo = repo;
-    this.memoryManager = memoryManager;
+    this.memoryManager = mm ?? memoryManager;
   }
 
   // Create a rumor from a memory or event
@@ -71,7 +71,7 @@ export class RumorEngine {
     if (rumor.knownByIds?.includes(listener.id)) return null;
 
     // Determine if rumor gets distorted
-    const distortionChance = 0.3 + (rumor.spreadCount * 0.1); // More spread = more distortion
+    const distortionChance = 0.3 + ((rumor.spreadCount ?? 0) * 0.1); // More spread = more distortion
     const shouldDistort = Math.random() < distortionChance;
 
     let finalContent = rumor.content;
@@ -88,7 +88,7 @@ export class RumorEngine {
     await this.repo.updateSpread(
       rumor.id,
       newKnownByIds,
-      rumor.spreadCount + 1,
+      (rumor.spreadCount ?? 0) + 1,
       shouldDistort ? finalContent : undefined
     );
 

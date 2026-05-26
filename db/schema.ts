@@ -84,6 +84,7 @@ export const agents = sqliteTable("agents", {
 });
 
 // ============ Memories ============
+export type Memory = typeof memories.$inferSelect;
 export const memories = sqliteTable("memories", {
   id: text("id").primaryKey(),
   agentId: text("agent_id").references(() => agents.id).notNull(),
@@ -151,6 +152,7 @@ export const llmCalls = sqliteTable("llm_calls", {
 });
 
 // ============ Chronicles ============
+export type Chronicle = typeof chronicles.$inferSelect;
 export const chronicles = sqliteTable("chronicles", {
   id: text("id").primaryKey(),
   worldId: text("world_id").references(() => worlds.id).notNull(),
@@ -169,6 +171,7 @@ export const chronicles = sqliteTable("chronicles", {
 });
 
 // ============ Rumors ============
+export type Rumor = typeof rumors.$inferSelect;
 export const rumors = sqliteTable("rumors", {
   id: text("id").primaryKey(),
   worldId: text("world_id").references(() => worlds.id).notNull(),
@@ -226,9 +229,7 @@ export const agentVocab = sqliteTable("agent_vocab", {
   learnedTick: integer("learned_tick").notNull(),
   usageCount: integer("usage_count").default(0),
   fidelity: real("fidelity").default(1.0), // lower = more likely to mutate
-}, (t) => ({
-  pk: { columns: [t.agentId, t.lexiconId] },
-}));
+});
 
 // ============ Reflections ============
 export const reflections = sqliteTable("reflections", {

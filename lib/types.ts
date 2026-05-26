@@ -3,6 +3,7 @@
 export type Position = {
   x: number;
   y: number;
+  dir?: string; // "down" | "up" | "left" | "right"
 };
 
 export type AgentStatus = "alive" | "sick" | "dead";
@@ -25,6 +26,10 @@ export type AgentIdentity = {
     distinguishingFeatures: string[];
   };
   initialGoals: string[];
+  familyName?: string;
+  parentIds?: string[];
+  childIds?: string[];
+  spouseId?: string;
 };
 
 export type AgentState = {
@@ -41,6 +46,7 @@ export type AgentState = {
   insideBuildingId?: string | null;
   currentGoals?: string[]; // F2: Long-term goals
   skills?: Record<string, number>; // G3: skill name → 0-100
+  pregnantSince?: number; // G2: tick when pregnancy started
   illness?: {
     name: string;
     severity: number;
@@ -48,6 +54,8 @@ export type AgentState = {
     estimatedDuration: number;
   };
   deathTick?: number;
+  isMoving?: boolean;
+  walkFrame?: number;
 };
 
 // ============ Time Types ============
@@ -72,11 +80,11 @@ export type MemoryType = "observation" | "event" | "dialogue" | "reflection" | "
 
 export type Memory = {
   id: string;
-  type: MemoryType;
+  type: string;
   content: string;
   importance: number;
   tick: number;
-  relatedAgentIds: string[];
+  relatedAgentIds?: string[];
 };
 
 // ============ Building Types ============

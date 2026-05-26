@@ -1,4 +1,5 @@
-import { Memory, AgentState } from "@/lib/types";
+import { AgentState } from "@/lib/types";
+import type { Memory } from "@/db/schema";
 import {
   MemoryRepository,
   reflectionRepo,
@@ -23,7 +24,7 @@ export class MemoryManager {
 
   // Add a new memory (stores to DB and caches in STM)
   async addMemory(input: CreateMemoryInput): Promise<Memory> {
-    const memory = await this.repo.create(input);
+    const memory = (await this.repo.create(input)) as unknown as Memory;
 
     // Update STM cache
     const agentStm = stmCache.get(input.agentId) || [];

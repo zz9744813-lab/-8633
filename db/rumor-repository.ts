@@ -1,6 +1,6 @@
 import { db } from "./index";
 import { rumors, type Rumor } from "./schema";
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lt } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 
 export type RumorType = "scandal" | "secret" | "event" | "relationship" | "achievement" | "danger";
@@ -58,13 +58,13 @@ export class RumorRepository {
 
   // Get rumors known by an agent
   async getKnownByAgent(agentId: string, worldId: string): Promise<Rumor[]> {
-    // Use JSON array containment check via LIKE
-    const likePattern = `%"${agentId}"%`;
-    return await db
+    // Filter in-memory for JSON array
+    const all = await db
       .select()
       .from(rumors)
-      .where(and(eq(rumors.worldId, worldId), rumors.knownByIds.like(likePattern)))
+      .where(eq(rumors.worldId, worldId))
       .orderBy(desc(rumors.tick));
+    return all.filter((r) => r.knownByIds?.includes(agentId));
   }
 
   // Get all rumors in a world
@@ -107,7 +107,7 @@ export class RumorRepository {
   async cleanup(worldId: string, beforeTick: number): Promise<void> {
     await db
       .delete(rumors)
-      .where(and(eq(rumors.worldId, worldId), rumors.tick.lessThan(beforeTick)));
+      .where(and(eq(rumors.worldId, worldId), lt(rumors.tick, beforeTick)));
   }
 }
 

@@ -1,6 +1,6 @@
 import { db } from "./index";
 import { chronicles, type Chronicle } from "./schema";
-import { eq, desc, and, gte, lte } from "drizzle-orm";
+import { eq, desc, and, gte, sql, SQL } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 
 export type ChronicleType =
@@ -82,36 +82,29 @@ export class ChronicleRepository {
 
   // List chronicles with filtering
   async list(filter: ChronicleFilter): Promise<Chronicle[]> {
-    let query = db
-      .select()
-      .from(chronicles)
-      .where(eq(chronicles.worldId, filter.worldId));
+    const conditions: SQL[] = [eq(chronicles.worldId, filter.worldId)];
 
     if (filter.year !== undefined) {
-      query = query.where(eq(chronicles.year, filter.year));
+      conditions.push(eq(chronicles.year, filter.year));
     }
 
     if (filter.season) {
-      query = query.where(eq(chronicles.season, filter.season));
+      conditions.push(eq(chronicles.season, filter.season));
     }
 
     if (filter.type) {
-      query = query.where(eq(chronicles.type, filter.type));
+      conditions.push(eq(chronicles.type, filter.type));
     }
 
     if (filter.minImportance !== undefined) {
-      query = query.where(gte(chronicles.importance, filter.minImportance));
+      conditions.push(gte(chronicles.importance, filter.minImportance));
     }
 
-    query = query.orderBy(desc(chronicles.tick));
-
-    if (filter.limit) {
-      query = query.limit(filter.limit);
-    }
-
-    if (filter.offset) {
-      query = query.offset(filter.offset);
-    }
+    const query = db
+      .select()
+      .from(chronicles)
+      .where(and(...conditions))
+      .orderBy(desc(chronicles.tick));
 
     return await query;
   }
@@ -168,15 +161,14 @@ export class ChronicleRepository {
 
   // Get chronicles involving a specific agent
   async getByAgent(agentId: string, limit: number = 50): Promise<Chronicle[]> {
-    // Note: This uses JSON array containment check
-    // SQLite doesn't have native JSON contains, so we use LIKE
-    const likePattern = `%"${agentId}"%`;
-    return await db
+    // Filter in-memory for JSON array
+    const all = await db
       .select()
       .from(chronicles)
-      .where(chronicles.agentIds.like(likePattern))
-      .orderBy(desc(chronicles.tick))
-      .limit(limit);
+      .orderBy(desc(chronicles.tick));
+    return all
+      .filter((c) => c.agentIds?.includes(agentId))
+      .slice(0, limit);
   }
 
   // Delete chronicles for a world
@@ -187,11 +179,11 @@ export class ChronicleRepository {
   // Count chronicles
   async count(worldId: string): Promise<number> {
     const result = await db
-      .select({ count: { value: chronicles.id } })
+      .select({ count: sql<number>`COUNT(*)` })
       .from(chronicles)
       .where(eq(chronicles.worldId, worldId));
 
-    return result[0]?.count?.value ?? 0;
+    return Number(result[0]?.count ?? 0);
   }
 }
 

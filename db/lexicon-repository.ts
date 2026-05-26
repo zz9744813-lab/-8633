@@ -10,8 +10,8 @@ export interface LexiconEntry {
   originAgentId: string;
   originTick: number;
   parentWordId: string | null;
-  popularity: number;
-  status: string;
+  popularity: number | null;
+  status: string | null;
 }
 
 export interface AgentVocabEntry {
@@ -19,8 +19,8 @@ export interface AgentVocabEntry {
   lexiconId: string;
   learnedFromAgentId: string | null;
   learnedTick: number;
-  usageCount: number;
-  fidelity: number;
+  usageCount: number | null;
+  fidelity: number | null;
 }
 
 export class LexiconRepository {

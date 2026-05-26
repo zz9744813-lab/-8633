@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import * as PIXI from "pixi.js";
 import {
-  generateAgentSprite,
+  generateWalkSheet,
   generateBuildingSprite,
   getCachedSprite,
 } from "@/lib/sprite-generator";
@@ -15,6 +15,8 @@ interface AgentData {
   name: string;
   occupation: string;
   currentActivity: string;
+  isMoving?: boolean;
+  dir?: string;
 }
 
 interface BuildingData {
@@ -117,17 +119,27 @@ export function WorldView({
   const groundRef = useRef<PIXI.Graphics | null>(null);
   const overlayRef = useRef<PIXI.Graphics | null>(null);
   const weatherContainerRef = useRef<PIXI.Container | null>(null);
-  const agentSpritesRef = useRef<Map<string, PIXI.Container>>(new Map());
+  const agentSpritesRef = useRef<Map<string, {
+    container: PIXI.Container;
+    sprite: PIXI.Sprite;
+    frames: PIXI.Texture[];
+    activityText: PIXI.Text;
+    targetX: number;
+    targetY: number;
+    targetMoving: boolean;
+  }>>(new Map());
   const buildingSpritesRef = useRef<Map<string, PIXI.Container>>(new Map());
   const timeRef = useRef(gameTime);
   const weatherRef = useRef(weather);
   const weatherIntensityRef = useRef(weatherIntensity);
   const seasonRef = useRef(season);
+  const agentDataRef = useRef(agents);
 
   useEffect(() => { timeRef.current = gameTime; }, [gameTime]);
   useEffect(() => { weatherRef.current = weather; }, [weather]);
   useEffect(() => { weatherIntensityRef.current = weatherIntensity; }, [weatherIntensity]);
   useEffect(() => { seasonRef.current = season; }, [season]);
+  useEffect(() => { agentDataRef.current = agents; }, [agents]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -172,9 +184,58 @@ export function WorldView({
 
       updateVisuals();
 
+      // Animation frame accumulator
+      let frameAccum = 0;
+      const FRAME_INTERVAL = 8; // ticks between frames
+
       // Weather particle ticker
       let particles: PIXI.Graphics[] = [];
       app.ticker?.add(() => {
+        const dt = app?.ticker?.deltaTime ?? 1;
+
+        // ── I2: Frame animation for agents ──
+        frameAccum += dt;
+        const sprites = agentSpritesRef.current;
+        const agentData = agentDataRef.current;
+
+        if (frameAccum >= FRAME_INTERVAL) {
+          frameAccum = 0;
+          for (const ad of agentData) {
+            const entry = sprites.get(ad.id);
+            if (!entry) continue;
+            const isMoving = ad.isMoving || entry.targetMoving;
+            if (!isMoving) {
+              entry.sprite.texture = entry.frames[0];
+            } else {
+              const currentIdx = entry.frames.indexOf(entry.sprite.texture);
+              const nextIdx = (currentIdx + 1) % entry.frames.length;
+              entry.sprite.texture = entry.frames[nextIdx];
+            }
+            if (ad.dir === "left") {
+              entry.sprite.scale.x = -Math.abs(entry.sprite.scale.x);
+            } else {
+              entry.sprite.scale.x = Math.abs(entry.sprite.scale.x);
+            }
+          }
+        }
+
+        // ── I2: Position interpolation ──
+        const lerpSpeed = 0.15 * dt;
+        for (const ad of agentData) {
+          const entry = sprites.get(ad.id);
+          if (!entry) continue;
+          entry.targetX = ad.x;
+          entry.targetY = ad.y;
+          entry.targetMoving = ad.isMoving ?? false;
+          entry.container.x += (entry.targetX - entry.container.x) * lerpSpeed;
+          entry.container.y += (entry.targetY - entry.container.y) * lerpSpeed;
+
+          if (entry.activityText.text !== ad.currentActivity) {
+            entry.activityText.text = ad.currentActivity;
+          }
+        }
+
+        // ── Weather particles ──
         const w = weatherRef.current;
         const intensity = weatherIntensityRef.current;
         const wc = weatherContainerRef.current;
@@ -186,8 +247,6 @@ export function WorldView({
 
         const count = Math.floor(intensity * 100);
         const targetParticles = Math.min(count, 300);
-
-        // Add new particles
         while (particles.length < targetParticles) {
           let p: PIXI.Graphics;
           const x = Math.random() * (width + 50) - 25;
@@ -204,16 +263,11 @@ export function WorldView({
           wc.addChild(p);
           particles.push(p);
         }
-
-        // Remove excess
         while (particles.length > targetParticles) {
           const p = particles.pop()!;
           wc.removeChild(p);
           p.destroy();
         }
-
-        // Animate
-        const dt = app?.ticker?.deltaTime ?? 1;
         for (const p of particles) {
           if (w === "rain") {
             p.y += (4 + intensity * 3) * dt;
@@ -238,7 +292,7 @@ export function WorldView({
       return () => {
         clearInterval(interval);
         if (app?.ticker) {
-          app.ticker.removeAllListeners();
+          app.ticker.destroy();
         }
         cancelled = true;
         if (app) {
@@ -266,14 +320,12 @@ export function WorldView({
       const overlay = overlayRef.current;
       overlay.clear();
 
-      // Season tint
       const seasonTint = SEASON_TINTS[seasonName] ?? 0xffffff;
       if (seasonTint !== 0xffffff) {
         overlay.rect(0, 0, width, height);
         overlay.fill({ color: seasonTint, alpha: 0.08 });
       }
 
-      // Night darkness
       const darkness = 1 - colors.lightLevel;
       if (darkness > 0) {
         overlay.rect(0, 0, width, height);
@@ -303,7 +355,7 @@ export function WorldView({
         buildingSprite.anchor.set(0.5);
         buildingSprite.scale.set(2);
         sprite.addChild(buildingSprite);
-        const text = new PIXI.Text({ text: building.name, style: { fontSize: 11, fill: 0xffffff, fontFamily: "sans-serif", stroke: { color: 0x000000, width: 3 }, dropShadow: true, dropShadowColor: 0x000000, dropShadowDistance: 1 } });
+        const text = new PIXI.Text({ text: building.name, style: { fontSize: 11, fill: 0xffffff, fontFamily: "sans-serif", stroke: { color: 0x000000, width: 3 }, dropShadow: { color: 0x000000, distance: 1 } } });
         text.anchor.set(0.5, 1);
         text.position.set(0, -20);
         sprite.addChild(text);
@@ -318,42 +370,55 @@ export function WorldView({
     });
   }, [buildings]);
 
+  // I2: Use walk sheet sprite with frame cycling
   useEffect(() => {
     const container = agentsContainerRef.current;
     if (!container) return;
     const sprites = agentSpritesRef.current;
     agents.forEach((agent) => {
-      let sprite = sprites.get(agent.id);
-      if (!sprite) {
-        sprite = new PIXI.Container();
-        const spriteUrl = getCachedSprite(`agent-${agent.id}`, () => generateAgentSprite({ name: agent.name, occupation: agent.occupation, seed: agent.name.split("").reduce((a, b) => a + b.charCodeAt(0), 0) }));
-        const texture = PIXI.Texture.from(spriteUrl);
-        const agentSprite = new PIXI.Sprite(texture);
+      let entry = sprites.get(agent.id);
+      if (!entry) {
+        const sheetUrl = getCachedSprite(`walk-${agent.id}`, () => generateWalkSheet({ name: agent.name, occupation: agent.occupation, seed: agent.name.split("").reduce((a, b) => a + b.charCodeAt(0), 0) }));
+        const sheetTexture = PIXI.Texture.from(sheetUrl);
+        const frames: PIXI.Texture[] = [];
+        for (let i = 0; i < 4; i++) {
+          const rect = new PIXI.Rectangle(i * 16, 0, 16, 24);
+          frames.push(new PIXI.Texture({ source: sheetTexture.source, frame: rect }));
+        }
+        const agentSprite = new PIXI.Sprite(frames[0]);
         agentSprite.anchor.set(0.5, 1);
         agentSprite.scale.set(1.5);
-        sprite.addChild(agentSprite);
+
+        const spriteContainer = new PIXI.Container();
+        spriteContainer.addChild(agentSprite);
+
         const nameText = new PIXI.Text({ text: agent.name, style: { fontSize: 10, fill: 0xffffff, fontFamily: "sans-serif", stroke: { color: 0x000000, width: 3 } } });
         nameText.anchor.set(0.5, 1);
         nameText.position.set(0, -28);
-        sprite.addChild(nameText);
+        spriteContainer.addChild(nameText);
+
         const activityText = new PIXI.Text({ text: agent.currentActivity, style: { fontSize: 8, fill: 0xffffaa, fontFamily: "sans-serif", stroke: { color: 0x000000, width: 2 } } });
         activityText.anchor.set(0.5, 0);
         activityText.position.set(0, 2);
-        sprite.addChild(activityText);
-        (sprite as any).activityText = activityText;
-        sprite.eventMode = "static";
-        sprite.cursor = "pointer";
-        sprite.on("pointerdown", () => { onAgentClick?.(agent); });
-        container.addChild(sprite);
-        sprites.set(agent.id, sprite);
+        spriteContainer.addChild(activityText);
+
+        spriteContainer.eventMode = "static";
+        spriteContainer.cursor = "pointer";
+        spriteContainer.on("pointerdown", () => { onAgentClick?.(agent); });
+
+        container.addChild(spriteContainer);
+        entry = { container: spriteContainer, sprite: agentSprite, frames, activityText, targetX: agent.x, targetY: agent.y, targetMoving: false };
+        sprites.set(agent.id, entry);
       }
-      sprite.x = agent.x;
-      sprite.y = agent.y;
-      const activityText = (sprite as any).activityText as PIXI.Text;
-      if (activityText && activityText.text !== agent.currentActivity) { activityText.text = agent.currentActivity; }
+      entry.targetX = agent.x;
+      entry.targetY = agent.y;
+      entry.targetMoving = agent.isMoving ?? false;
+      if (entry.activityText.text !== agent.currentActivity) {
+        entry.activityText.text = agent.currentActivity;
+      }
     });
-    sprites.forEach((sprite, id) => {
-      if (!agents.find((a) => a.id === id)) { container.removeChild(sprite); sprites.delete(id); }
+    sprites.forEach((entry, id) => {
+      if (!agents.find((a) => a.id === id)) { container.removeChild(entry.container); sprites.delete(id); }
     });
   }, [agents, onAgentClick]);
 

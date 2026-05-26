@@ -120,7 +120,7 @@ export function MemoryViewer({ agentId, agentName, isOpen, onClose, currentTick 
         {/* Tabs */}
         <div className="flex border-b border-border">
           {[
-            { id: "stm", label: "短期记忆", icon: History }, count: stm.length },
+            { id: "stm", label: "短期记忆", icon: History, count: stm.length },
             { id: "ltm", label: "长期记忆", icon: Brain, count: ltm.length },
             { id: "reflection", label: "反思", icon: Sparkles, count: reflections.length },
           ].map((tab) => (

@@ -63,7 +63,7 @@ export function ChroniclePanel({ worldId }: ChroniclePanelProps) {
 
       // Extract unique years
       const uniqueYears = Array.from(
-        new Set(data.chronicles.map((c: Chronicle) => c.year))
+        new Set((data.chronicles as Chronicle[]).map((c) => c.year))
       ).sort((a, b) => b - a) as number[];
       setYears(uniqueYears);
     } catch (e) {

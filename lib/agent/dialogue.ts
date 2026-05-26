@@ -1,7 +1,8 @@
 import { getLLMClient } from "@/lib/llm/client";
 import { memoryManager } from "@/lib/agent/memory";
 import { relationshipManager } from "@/db/relationship-repository";
-import { Agent, AgentIdentity } from "@/lib/agent/agent";
+import { Agent } from "@/lib/agent/agent";
+import { AgentIdentity } from "@/lib/types";
 import { EraPack } from "@/lib/era-pack/loader";
 import { rumorEngine } from "./rumor-engine";
 import { World } from "./world";
@@ -154,7 +155,7 @@ Respond with JSON:
           context.topic
         );
         if (spreadResult?.distorted) {
-          console.log(`[Rumor] ${context.speaker.identity.name} told ${context.listener.identity.name} a distorted rumor about ${spreadResult.content.substring(0, 50)}...`);
+          console.log(`[Rumor] ${context.speaker.identity.name} told ${context.listener.identity.name} a distorted rumor${spreadResult.content ? ` about ${spreadResult.content.substring(0, 50)}` : ""}...`);
         } else if (spreadResult) {
           console.log(`[Rumor] ${context.speaker.identity.name} told ${context.listener.identity.name} a rumor`);
         }
@@ -206,7 +207,7 @@ Respond with JSON:
   // Build system prompt with era constraints
   private buildDialoguePrompt(
     context: DialogueContext,
-    relationship: { label: string; affinity: number } | null
+    relationship: { label?: string; affinity: number } | null
   ): string {
     let prompt = "You are roleplaying as a character in a simulation. Stay in character at all times.";
 

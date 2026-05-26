@@ -3,7 +3,7 @@ import { worlds, agents as agentsTable, buildings as buildingsTable, memories } 
 import { eq, desc, sql } from "drizzle-orm";
 import { World } from "@/lib/agent/world";
 import { Agent, DailyPlan } from "@/lib/agent/agent";
-import { AgentIdentity, AgentState, Building, Position } from "@/lib/types";
+import { AgentIdentity, AgentState, Building, BuildingType, Position } from "@/lib/types";
 import { loadEraPack } from "@/lib/era-pack/loader";
 
 export interface WorldSnapshot {
@@ -179,11 +179,11 @@ export class WorldRepository {
 
     const loadedBuildings: Building[] = buildingRecords.map((b) => ({
       id: b.id,
-      type: b.type,
-      name: b.name,
+      type: b.type as BuildingType,
+      name: b.name ?? "",
       position: (b.position as Position) || { x: b.x || 0, y: b.y || 0 },
-      width: b.width || b.w || 1,
-      height: b.height || b.h || 1,
+      width: (b.width || b.w || 1) as number,
+      height: (b.height || b.h || 1) as number,
       ownerId: b.ownerId ?? undefined,
       description: b.description ?? undefined,
     }));
@@ -235,11 +235,11 @@ export class WorldRepository {
     return {
       id: world.id,
       name: world.name,
-      width: world.width,
-      height: world.height,
-      tickCount: world.tickCount,
-      speed: world.speed,
-      paused: world.paused,
+      width: world.width ?? 800,
+      height: world.height ?? 600,
+      tickCount: world.tickCount ?? 0,
+      speed: world.speed ?? 1,
+      paused: world.paused ?? false,
       eraPackId: world.eraPackId,
       agents: loadedAgents,
       buildings: loadedBuildings,
@@ -314,8 +314,16 @@ export class WorldRepository {
       .orderBy(desc(worlds.updatedAt));
 
     return records.map((r) => ({
-      ...r,
-      paused: r.paused === 1,
+      id: r.id,
+      name: r.name,
+      width: r.width ?? 100,
+      height: r.height ?? 100,
+      tickCount: r.tickCount ?? 0,
+      speed: r.speed ?? 1,
+      paused: r.paused === true,
+      eraPackId: r.eraPackId,
+      createdAt: r.createdAt!,
+      updatedAt: r.updatedAt!,
     }));
   }
 

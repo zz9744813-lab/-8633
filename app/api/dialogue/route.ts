@@ -3,6 +3,8 @@ import { getWorld } from "@/lib/agent";
 import { getLLMClient } from "@/lib/llm/client";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 // Dialogue system
 export interface Dialogue {
   id: string;
@@ -65,7 +67,7 @@ ${context ? `Context: ${context}` : ""}
 
 Respond with a brief, natural line of dialogue (1-2 sentences). Stay in character. Use period-appropriate language if applicable.`;
 
-        const { text } = await llm.generateText(
+        const text = await llm.generateText(
           `What do you say to ${listener.identity.name}?`,
           systemPrompt
         );
@@ -76,7 +78,7 @@ Respond with a brief, natural line of dialogue (1-2 sentences). Stay in characte
           speakerName: speaker.identity.name,
           message: text.trim(),
           timestamp: Date.now(),
-          tick: world.tick,
+          tick: (world as any).tickCount || 0,
           listeners: [listenerId],
           context,
         };
@@ -117,7 +119,7 @@ Respond with a brief, natural line of dialogue (1-2 sentences). Stay in characte
           speakerName: agent.identity.name,
           message,
           timestamp: Date.now(),
-          tick: world.tick,
+          tick: (world as any).tickCount || 0,
           listeners,
         };
 
@@ -145,7 +147,7 @@ Respond with a brief, natural line of dialogue (1-2 sentences). Stay in characte
           speakerName: agent.identity.name,
           message: `【大喊】${message}`,
           timestamp: Date.now(),
-          tick: world.tick,
+          tick: (world as any).tickCount || 0,
           listeners,
         };
 

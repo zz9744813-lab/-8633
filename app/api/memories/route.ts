@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { memoryManager, reflectionEngine } from "@/lib/agent/memory";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/memories?agentId=xxx&layer=stm|ltm|reflection
 export async function GET(request: NextRequest) {
   try {

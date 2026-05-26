@@ -3,7 +3,7 @@ import { memories, reflections, Memory } from "./schema";
 import { eq, and, desc, sql, notInArray } from "drizzle-orm";
 import { vectorMemoryStore } from "./vector-memory";
 
-export type MemoryType = "observation" | "event" | "dialogue" | "reflection" | "plan";
+export type MemoryType = "observation" | "event" | "dialogue" | "reflection" | "plan" | "rumor";
 
 export interface CreateMemoryInput {
   agentId: string;

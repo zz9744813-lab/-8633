@@ -105,6 +105,19 @@ export class RelationshipManager {
     }
   }
 
+  // Set a custom label on a relationship (used for lover/engaged/married)
+  async setRelationshipLabel(fromAgentId: string, toAgentId: string, label: string): Promise<void> {
+    const existing = await this.getRelationship(fromAgentId, toAgentId);
+    if (existing) {
+      await db.update(relationships).set({ label }).where(eq(relationships.id, existing.id));
+    } else {
+      const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      await db.insert(relationships).values({
+        id, fromAgentId, toAgentId, affinity: 50, familiarity: 50, label, lastInteractionTick: Date.now(),
+      });
+    }
+  }
+
   // Determine relationship label based on affinity and familiarity
   private determineLabel(affinity: number, familiarity: number): string {
     if (familiarity < 10) return "stranger";

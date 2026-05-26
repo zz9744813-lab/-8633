@@ -7,6 +7,7 @@ import { AgentIdentity, Building, Position } from "@/lib/types";
 import { EraPack } from "@/lib/era-pack/loader";
 import { worldEventSystem } from "@/db/world-event-repository";
 import { worldRepository } from "@/db/world-repository";
+import { relationshipManager } from "@/db/relationship-repository";
 
 // World simulation
 export class World {
@@ -29,7 +30,7 @@ export class World {
 
   private tickInterval: NodeJS.Timeout | null = null;
   private running: boolean = false;
-  private onTickCallbacks: Array<(world: World) => void> = [];
+  onTickCallbacks: Array<(world: World) => void> = [];
 
   constructor(
     id: string,
@@ -96,7 +97,7 @@ export class World {
       buildings: this.buildings.map((b) => ({
         id: b.id,
         name: b.name,
-        type: b.type,
+        type: b.type as string,
         position: b.position,
       })),
       currentTime: this.formatGameTime(),
@@ -149,8 +150,16 @@ export class World {
           }
         }
 
+        // G2: Age increment (once per year on day 0)
+        const daysPassed = Math.floor(this.tickCount / 144);
+        const prevDays = Math.floor((this.tickCount - 1) / 144);
+        const dayOfYear = daysPassed % 365;
+        if (dayOfYear === 0 && daysPassed > 0 && daysPassed !== prevDays) {
+          agent.identity.age += 1;
+        }
+
         // Death check
-        if (agent.state.health <= 0 && agent.state.status !== "dead") {
+        if (agent.state.health <= 0) {
           agent.state.status = "dead";
           agent.state.deathTick = this.tickCount;
           const cause = agent.state.illness?.name ?? "年老";
@@ -176,6 +185,93 @@ export class World {
           }
 
           console.log(`[World] ${agent.identity.name} has died at age ${agent.identity.age} (${cause})`);
+        }
+      }
+    }
+
+    // === G2: Marriage/family check at midnight ===
+    if (hour === 0 && minute === 0) {
+      // Check each pair for relationship upgrade to marriage
+      const agentsList = Array.from(this.agents.values()).filter(a => a.state.status === "alive" && a.identity.age >= 16);
+      for (let i = 0; i < agentsList.length; i++) {
+        const a = agentsList[i];
+        if (a.identity.spouseId) continue;
+        const relations = await a.getAllRelationships().catch(() => []);
+        for (const rel of relations) {
+          const b = this.agents.get(rel.toAgentId);
+          if (!b || b.identity.spouseId || b.state.status !== "alive" || b.identity.age < 16) continue;
+          if (rel.affinity > 0.85 && !rel.label?.includes("lover") && !rel.label?.includes("engaged") && !rel.label?.includes("married")) {
+            await relationshipManager.setRelationshipLabel(a.id, b.id, "lover");
+            console.log(`[G2] ${a.identity.name} and ${b.identity.name} became lovers`);
+          } else if (rel.affinity > 0.9 && rel.label === "lover") {
+            await relationshipManager.setRelationshipLabel(a.id, b.id, "engaged");
+            console.log(`[G2] ${a.identity.name} and ${b.identity.name} got engaged`);
+          } else if (rel.label === "engaged" && Math.random() < 0.1) {
+            await relationshipManager.setRelationshipLabel(a.id, b.id, "married");
+            a.identity.spouseId = b.id;
+            b.identity.spouseId = a.id;
+            const familyName = a.identity.familyName || a.identity.name.split(" ").pop() || a.identity.name;
+            if (!a.identity.familyName) a.identity.familyName = familyName;
+            if (!b.identity.familyName) b.identity.familyName = familyName;
+            await chronicleEngine.recordMarriage(this, a, b);
+            console.log(`[G2] ${a.identity.name} and ${b.identity.name} got married!`);
+          }
+        }
+      }
+
+      // Trigger pregnancy for married couples
+      for (const agent of agentsList) {
+        if (!agent.identity.spouseId || agent.state.pregnantSince) continue;
+        if (agent.identity.age > 45 || agent.identity.gender !== "female") continue;
+        const spouse = this.agents.get(agent.identity.spouseId);
+        if (!spouse || spouse.state.status !== "alive" || spouse.identity.age > 45) continue;
+        const rel = await agent.getRelationshipWith(spouse.id).catch(() => null);
+        if (!rel || rel.affinity < 0.7) continue;
+        const lastChildTick = agent.identity.childIds?.length
+          ? Math.max(...agent.identity.childIds.map(id => this.agents.get(id)?.state?.deathTick ?? 0))
+          : 0;
+        if (this.tickCount - lastChildTick < 52560) continue; // ~1 year
+        if (Math.random() < 0.05) {
+          agent.state.pregnantSince = this.tickCount;
+          await memoryManager.addMemory({
+            agentId: agent.id, type: "observation",
+            content: "你怀孕了。", importance: 0.85, tick: this.tickCount,
+          });
+          console.log(`[G2] ${agent.identity.name} is pregnant!`);
+        }
+      }
+
+      // Check pregnancies and give birth
+      const DAYS_PREGNANCY = 270;
+      for (const agent of agentsList) {
+        if (!agent.state.pregnantSince) continue;
+        const pregnantTicks = this.tickCount - agent.state.pregnantSince;
+        if (pregnantTicks >= DAYS_PREGNANCY * 144) {
+          // Give birth
+          const spouse = agent.identity.spouseId ? this.agents.get(agent.identity.spouseId) : null;
+          agent.state.pregnantSince = undefined;
+          const childId = `child-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+          const childName = spouse
+            ? `${spouse.identity.name.split(" ")[0]} Jr.`
+            : `${agent.identity.name.split(" ")[0]}'s Child`;
+          const childIdentity: AgentIdentity = {
+            name: childName, age: 0, gender: Math.random() > 0.5 ? "male" : "female",
+            occupation: "child", backstory: `${agent.identity.name}之子`,
+            personality: { traits: ["好奇"], values: [], quirks: [] },
+            appearance: { description: "孩童", hairColor: "褐色", skinTone: "白皙", distinguishingFeatures: [] },
+            initialGoals: [],
+            parentIds: [agent.id, ...(spouse ? [spouse.id] : [])],
+            familyName: agent.identity.familyName || agent.identity.name.split(" ").pop(),
+          };
+          const childAgent = this.addAgent(childId, childIdentity, undefined, true);
+          childAgent.state.health = 1.0;
+          if (!agent.identity.childIds) agent.identity.childIds = [];
+          agent.identity.childIds.push(childId);
+          if (spouse) {
+            if (!spouse.identity.childIds) spouse.identity.childIds = [];
+            spouse.identity.childIds.push(childId);
+          }
+          console.log(`[G2] ${agent.identity.name} gave birth to ${childName}`);
         }
       }
     }

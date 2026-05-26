@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWorld } from "@/lib/agent";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const agentId = request.nextUrl.searchParams.get("agentId");
   if (!agentId) {

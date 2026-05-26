@@ -33,8 +33,8 @@ export class DramaEngine {
   private memoryManager: MemoryManager;
   private triggeredDramas: Set<string> = new Set(); // Track to avoid duplicates
 
-  constructor(memoryManager: MemoryManager = memoryManager) {
-    this.memoryManager = memoryManager;
+  constructor(mm?: MemoryManager) {
+    this.memoryManager = mm ?? memoryManager;
   }
 
   // Check for potential dramatic situations
@@ -68,7 +68,7 @@ export class DramaEngine {
   // F4.1: Love triangle detection
   private async checkLoveTriangle(world: World, agents: Agent[]): Promise<DramaEvent | null> {
     for (const agentA of agents) {
-      const relationsA = await relationshipManager.getAllRelationships(agentA.id);
+      const relationsA = await relationshipManager.getAgentRelationships(agentA.id);
 
       for (const rel of relationsA) {
         // Find positive relationships (potential romantic interest)
@@ -77,7 +77,7 @@ export class DramaEngine {
           if (!agentB) continue;
 
           // Check if both A and B have high affinity with a third person C
-          const relationsB = await relationshipManager.getAllRelationships(agentB.id);
+          const relationsB = await relationshipManager.getAgentRelationships(agentB.id);
 
           for (const relB of relationsB) {
             if (relB.toAgentId === agentA.id) continue; // Skip back to A
@@ -322,8 +322,7 @@ export class DramaEngine {
     // Apply relationship changes
     for (const change of drama.impact.relationshipChanges) {
       const current = await relationshipManager.getRelationship(change.from, change.to);
-      const newAffinity = Math.max(-1, Math.min(1, (current?.affinity || 0) + change.delta));
-      await relationshipManager.updateAffinity(change.from, change.to, newAffinity);
+      await relationshipManager.updateRelationship(change.from, change.to, change.delta * 10, 5, world.tickCount);
     }
 
     // Apply goal changes

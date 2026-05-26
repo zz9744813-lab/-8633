@@ -22,34 +22,42 @@ occupations:
     name: 农民
     workplace: farm
     description: 耕种土地，种植小麦、大麦等作物
+    initialSkills: { farming: 25, animal_handling: 20 }
   - id: blacksmith
     name: 铁匠
     workplace: smithy
     description: 锻造农具、马蹄铁和简单的金属制品
+    initialSkills: { smithing: 30, bargaining: 10, reading: 5 }
   - id: innkeeper
     name: 酒馆老板
     workplace: tavern
     description: 经营酒馆，为旅人提供食宿和酒水
+    initialSkills: { hospitality: 25, bargaining: 15 }
   - id: merchant
     name: 商人
     workplace: market
     description: 买卖商品，可能是布料、香料或日用品
+    initialSkills: { bargaining: 30, reading: 15 }
   - id: priest
     name: 牧师
     workplace: church
     description: 主持礼拜，为社区居民提供精神指导
+    initialSkills: { reading: 35, oration: 25 }
   - id: weaver
     name: 织工
     workplace: cottage
     description: 在家织布，制作衣物和布料
+    initialSkills: { weaving: 30 }
   - id: carpenter
     name: 木匠
     workplace: workshop
     description: 制作家具、房屋结构和其他木制品
+    initialSkills: { carpentry: 30, smithing: 5 }
   - id: baker
     name: 面包师
     workplace: bakery
     description: 烤制面包和糕点
+    initialSkills: { baking: 30, bargaining: 5 }
 
 buildingTypes:
   - id: cottage

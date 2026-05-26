@@ -16,6 +16,7 @@ const EraPackSchema = z.object({
     name: z.string(),
     workplace: z.string(),
     description: z.string(),
+    initialSkills: z.record(z.number()).default({}),
   })),
   buildingTypes: z.array(z.object({
     id: z.string(),

@@ -21,6 +21,11 @@ interface AgentState {
   activity: string;
   mood: number;
   energy: number;
+  health?: number;
+  status?: string;
+  skills?: Record<string, number>;
+  currentGoals?: string[];
+  dailyPlan?: { morningThought: string; steps: { time: string; description: string }[]; currentStepIdx: number };
 }
 
 interface WorldEvent {
@@ -97,7 +102,7 @@ export default function Home() {
             season: message.world.season ?? getSeason(message.world.tick),
             weather: message.world.weather ?? "clear",
             weatherIntensity: message.world.weatherIntensity ?? 0,
-            agents: message.world.agents.map((a: { id: string; identity: { name: string }; state: { position: { x: number; y: number }; currentActivity: string; mood: number; energy: number } }) => ({
+            agents: message.world.agents.map((a: any) => ({
               id: a.id,
               name: a.identity.name,
               x: a.state.position.x,
@@ -105,6 +110,11 @@ export default function Home() {
               activity: a.state.currentActivity,
               mood: a.state.mood,
               energy: a.state.energy,
+              health: a.state.health,
+              status: a.state.status,
+              skills: a.state.skills,
+              currentGoals: a.state.currentGoals,
+              dailyPlan: a.dailyPlan,
             })),
             events: [],
           });
@@ -305,6 +315,23 @@ export default function Home() {
                   <span>({selectedAgent.x.toFixed(0)}, {selectedAgent.y.toFixed(0)})</span>
                 </div>
               </div>
+
+              {/* G3: Skills bar chart */}
+              {selectedAgent.skills && Object.keys(selectedAgent.skills).length > 0 && (
+                <div className="mt-3 text-xs space-y-1">
+                  {Object.entries(selectedAgent.skills).map(([name, lv]) => (
+                    <div key={name}>
+                      <div className="flex justify-between">
+                        <span>{name}</span>
+                        <span className="text-muted-foreground">{Math.floor(lv)}/100</span>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded overflow-hidden">
+                        <div className="h-full bg-primary rounded transition-all" style={{ width: `${lv}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Daily Plan Display */}
               {selectedAgent.dailyPlan && (

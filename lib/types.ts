@@ -40,6 +40,7 @@ export type AgentState = {
   targetPosition?: Position | null;
   insideBuildingId?: string | null;
   currentGoals?: string[]; // F2: Long-term goals
+  skills?: Record<string, number>; // G3: skill name → 0-100
   illness?: {
     name: string;
     severity: number;

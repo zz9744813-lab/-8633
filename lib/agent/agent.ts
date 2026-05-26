@@ -65,6 +65,15 @@ export class Agent {
     this.id = id;
     this.identity = identity;
     this.eraPack = eraPack;
+    // G3: Get initial skills from era pack occupation
+    let initialSkills: Record<string, number> = {};
+    if (eraPack) {
+      const occ = eraPack.occupations.find(o => o.name === identity.occupation || o.id === identity.occupation);
+      if (occ?.initialSkills) {
+        initialSkills = { ...occ.initialSkills };
+      }
+    }
+
     this.state = {
       id,
       name: identity.name,
@@ -75,6 +84,7 @@ export class Agent {
       mood: 50,
       stress: 30,
       health: 1.0,
+      skills: initialSkills,
       currentGoals: identity.initialGoals ?? [],
     };
   }
@@ -139,6 +149,16 @@ ${this.eraPack.forbiddenConcepts.join("、")}
 
 [当前天气] ${worldState.weather ?? "晴"}, 强度 ${worldState.weatherIntensity ?? 0}
 ${worldState.weather && worldState.weather !== "clear" ? "恶劣天气下你更倾向于待在室内。" : ""}
+
+[你的技能水平]
+${this.state.skills && Object.keys(this.state.skills).length > 0
+  ? Object.entries(this.state.skills)
+    .filter(([_, lv]) => lv > 0)
+    .map(([k, lv]) => {
+      const level = lv >= 80 ? "宗师" : lv >= 60 ? "熟练" : lv >= 30 ? "中等" : "初学"
+      return `${k}: ${level} (${Math.floor(lv)})`
+    }).join("\n")
+  : "暂无专业技能"}
 
 [长期目标]
 ${this.state.currentGoals.length > 0
@@ -413,6 +433,16 @@ What do you want to do next?`;
       case "WORK": {
         this.state.currentActivity = "working";
         this.state.energy = Math.max(0, this.state.energy - 2);
+        // G3: Grow primary skill
+        if (this.eraPack && this.state.skills) {
+          const occ = this.eraPack.occupations.find(o => o.name === this.identity.occupation || o.id === this.identity.occupation);
+          const primarySkill = occ ? Object.keys(occ.initialSkills ?? {})[0] : null;
+          if (primarySkill) {
+            const current = this.state.skills[primarySkill] ?? 0;
+            const gain = Math.max(0.01, (100 - current) * 0.005);
+            this.state.skills[primarySkill] = Math.min(100, current + gain);
+          }
+        }
         return true;
       }
       case "EAT": {

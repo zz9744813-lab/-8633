@@ -103,6 +103,8 @@ export class Agent {
   async generateDailyPlan(currentTick: number, worldState: {
     buildings: Array<{ id: string; name: string; type: string; position: Position }>;
     currentTime: string;
+    weather?: string;
+    weatherIntensity?: number;
   }): Promise<DailyPlan> {
     const llm = getLLMClient();
 
@@ -134,6 +136,9 @@ ${this.eraPack.forbiddenConcepts.join("、")}
 背景：${this.identity.backstory ?? ""}
 
 [当前状态] energy: ${this.state.energy}, mood: ${this.state.mood}, stress: ${this.state.stress}, health: ${(this.state.health * 100).toFixed(0)}%, status: ${this.state.status}${this.state.illness ? `, 患病: ${this.state.illness.name}` : ""}
+
+[当前天气] ${worldState.weather ?? "晴"}, 强度 ${worldState.weatherIntensity ?? 0}
+${worldState.weather && worldState.weather !== "clear" ? "恶劣天气下你更倾向于待在室内。" : ""}
 
 [长期目标]
 ${this.state.currentGoals.length > 0

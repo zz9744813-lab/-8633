@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import * as PIXI from "pixi.js";
 import {
   generateAgentSprite,
-  generateAgentPortrait,
   generateBuildingSprite,
   getCachedSprite,
 } from "@/lib/sprite-generator";
@@ -34,66 +33,69 @@ interface WorldViewProps {
   tileSize?: number;
   agents?: AgentData[];
   buildings?: BuildingData[];
-  gameTime?: { hour: number; minute: number }; // 0-23 hours
+  gameTime?: { hour: number; minute: number };
+  weather?: string;
+  weatherIntensity?: number;
+  season?: string;
   onAgentClick?: (agent: AgentData) => void;
 }
 
-// Time-based colors for day/night cycle
+const SEASON_TINTS: Record<string, number> = {
+  spring: 0xeeffea,
+  summer: 0xffffff,
+  autumn: 0xffeedd,
+  winter: 0xddeeff,
+};
+
 function getTimeOfDayColors(hour: number): {
-  sky: number;
-  ground: number;
-  ambient: number;
-  lightLevel: number;
+  sky: number; ground: number; ambient: number; lightLevel: number;
 } {
-  // Dawn: 5-7, Day: 7-17, Dusk: 17-19, Night: 19-5
   if (hour >= 5 && hour < 7) {
-    // Dawn
     const t = (hour - 5) / 2;
-    return {
-      sky: interpolateColor(0x1a1a2e, 0x87ceeb, t),
-      ground: interpolateColor(0x1a2a1a, 0x2d5016, t),
-      ambient: 0.3 + t * 0.4,
-      lightLevel: 0.4 + t * 0.4,
-    };
+    return { sky: interpolateColor(0x1a1a2e, 0x87ceeb, t), ground: interpolateColor(0x1a2a1a, 0x2d5016, t), ambient: 0.3 + t * 0.4, lightLevel: 0.4 + t * 0.4 };
   } else if (hour >= 7 && hour < 17) {
-    // Day
-    return {
-      sky: 0x87ceeb,
-      ground: 0x2d5016,
-      ambient: 1.0,
-      lightLevel: 1.0,
-    };
+    return { sky: 0x87ceeb, ground: 0x2d5016, ambient: 1.0, lightLevel: 1.0 };
   } else if (hour >= 17 && hour < 19) {
-    // Dusk
     const t = (hour - 17) / 2;
-    return {
-      sky: interpolateColor(0x87ceeb, 0x2d1b4e, t),
-      ground: interpolateColor(0x2d5016, 0x1a2a1a, t),
-      ambient: 1.0 - t * 0.5,
-      lightLevel: 1.0 - t * 0.6,
-    };
+    return { sky: interpolateColor(0x87ceeb, 0x2d1b4e, t), ground: interpolateColor(0x2d5016, 0x1a2a1a, t), ambient: 1.0 - t * 0.5, lightLevel: 1.0 - t * 0.6 };
   } else {
-    // Night
-    return {
-      sky: 0x0a0a1a,
-      ground: 0x151a15,
-      ambient: 0.2,
-      lightLevel: 0.15,
-    };
+    return { sky: 0x0a0a1a, ground: 0x151a15, ambient: 0.2, lightLevel: 0.15 };
   }
 }
 
 function interpolateColor(c1: number, c2: number, t: number): number {
-  const r1 = (c1 >> 16) & 0xff;
-  const g1 = (c1 >> 8) & 0xff;
-  const b1 = c1 & 0xff;
-  const r2 = (c2 >> 16) & 0xff;
-  const g2 = (c2 >> 8) & 0xff;
-  const b2 = c2 & 0xff;
-  const r = Math.round(r1 + (r2 - r1) * t);
-  const g = Math.round(g1 + (g2 - g1) * t);
-  const b = Math.round(b1 + (b2 - b1) * t);
-  return (r << 16) | (g << 8) | b;
+  const r1 = (c1 >> 16) & 0xff, g1 = (c1 >> 8) & 0xff, b1 = c1 & 0xff;
+  const r2 = (c2 >> 16) & 0xff, g2 = (c2 >> 8) & 0xff, b2 = c2 & 0xff;
+  return (Math.round(r1 + (r2 - r1) * t) << 16) | (Math.round(g1 + (g2 - g1) * t) << 8) | Math.round(b1 + (b2 - b1) * t);
+}
+
+function spawnRainDrop(x: number, y: number, intensity: number): PIXI.Graphics {
+  const g = new PIXI.Graphics();
+  g.rect(0, 0, 1, 2 + intensity * 4);
+  g.fill({ color: 0x8ab8d4, alpha: 0.3 + intensity * 0.4 });
+  g.x = x;
+  g.y = y;
+  return g;
+}
+
+function spawnSnowFlake(x: number, y: number): PIXI.Graphics {
+  const g = new PIXI.Graphics();
+  g.circle(0, 0, 1 + Math.random());
+  g.fill({ color: 0xffffff, alpha: 0.5 + Math.random() * 0.3 });
+  g.x = x;
+  g.y = y;
+  return g;
+}
+
+function spawnFogPatch(x: number, y: number): PIXI.Graphics {
+  const g = new PIXI.Graphics();
+  const w = 30 + Math.random() * 60;
+  const h = 10 + Math.random() * 20;
+  g.ellipse(0, 0, w, h);
+  g.fill({ color: 0xcccccc, alpha: 0.05 + Math.random() * 0.08 });
+  g.x = x;
+  g.y = y;
+  return g;
 }
 
 export function WorldView({
@@ -103,6 +105,9 @@ export function WorldView({
   agents = [],
   buildings = [],
   gameTime = { hour: 12, minute: 0 },
+  weather = "clear",
+  weatherIntensity = 0,
+  season = "spring",
   onAgentClick,
 }: WorldViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -111,16 +116,19 @@ export function WorldView({
   const buildingsContainerRef = useRef<PIXI.Container | null>(null);
   const groundRef = useRef<PIXI.Graphics | null>(null);
   const overlayRef = useRef<PIXI.Graphics | null>(null);
+  const weatherContainerRef = useRef<PIXI.Container | null>(null);
   const agentSpritesRef = useRef<Map<string, PIXI.Container>>(new Map());
   const buildingSpritesRef = useRef<Map<string, PIXI.Container>>(new Map());
   const timeRef = useRef(gameTime);
+  const weatherRef = useRef(weather);
+  const weatherIntensityRef = useRef(weatherIntensity);
+  const seasonRef = useRef(season);
 
-  // Keep time ref updated
-  useEffect(() => {
-    timeRef.current = gameTime;
-  }, [gameTime]);
+  useEffect(() => { timeRef.current = gameTime; }, [gameTime]);
+  useEffect(() => { weatherRef.current = weather; }, [weather]);
+  useEffect(() => { weatherIntensityRef.current = weatherIntensity; }, [weatherIntensity]);
+  useEffect(() => { seasonRef.current = season; }, [season]);
 
-  // Initialize PixiJS
   useEffect(() => {
     if (!containerRef.current) return;
     let cancelled = false;
@@ -129,252 +137,227 @@ export function WorldView({
     (async () => {
       app = new PIXI.Application();
       await app.init({
-        width,
-        height,
+        width, height,
         backgroundAlpha: 0,
         antialias: false,
         resolution: window.devicePixelRatio || 1,
       });
 
-      if (cancelled) {
-        app.destroy(true);
-        return;
-      }
+      if (cancelled) { app.destroy(true); return; }
 
       containerRef.current!.appendChild(app.canvas);
       appRef.current = app;
 
-      // Create ground
       const ground = new PIXI.Graphics();
       groundRef.current = ground;
       app.stage.addChild(ground);
 
-      // Create buildings container
       const buildingsContainer = new PIXI.Container();
       buildingsContainerRef.current = buildingsContainer;
       app.stage.addChild(buildingsContainer);
 
-      // Create agents container
       const agentsContainer = new PIXI.Container();
       agentsContainerRef.current = agentsContainer;
       app.stage.addChild(agentsContainer);
 
-      // Create night overlay
+      const weatherContainer = new PIXI.Container();
+      weatherContainerRef.current = weatherContainer;
+      weatherContainer.eventMode = "none";
+      app.stage.addChild(weatherContainer);
+
       const overlay = new PIXI.Graphics();
       overlayRef.current = overlay;
+      overlay.eventMode = "none";
       app.stage.addChild(overlay);
 
-      // Initial render
       updateVisuals();
+
+      // Weather particle ticker
+      let particles: PIXI.Graphics[] = [];
+      app.ticker?.add(() => {
+        const w = weatherRef.current;
+        const intensity = weatherIntensityRef.current;
+        const wc = weatherContainerRef.current;
+        if (!wc || w === "clear" || intensity <= 0) {
+          for (const p of particles) { wc?.removeChild(p); p.destroy(); }
+          particles = [];
+          return;
+        }
+
+        const count = Math.floor(intensity * 100);
+        const targetParticles = Math.min(count, 300);
+
+        // Add new particles
+        while (particles.length < targetParticles) {
+          let p: PIXI.Graphics;
+          const x = Math.random() * (width + 50) - 25;
+          const y = Math.random() * (height + 50) - 25;
+          if (w === "rain" || w === "storm") {
+            p = spawnRainDrop(x, y, intensity);
+          } else if (w === "snow") {
+            p = spawnSnowFlake(x, y);
+          } else if (w === "fog") {
+            p = spawnFogPatch(x, y);
+          } else {
+            break;
+          }
+          wc.addChild(p);
+          particles.push(p);
+        }
+
+        // Remove excess
+        while (particles.length > targetParticles) {
+          const p = particles.pop()!;
+          wc.removeChild(p);
+          p.destroy();
+        }
+
+        // Animate
+        const dt = app?.ticker?.deltaTime ?? 1;
+        for (const p of particles) {
+          if (w === "rain") {
+            p.y += (4 + intensity * 3) * dt;
+            if (p.y > height + 20) p.y -= height + 40;
+          } else if (w === "storm") {
+            p.y += (6 + intensity * 4) * dt;
+            p.x += (Math.random() - 0.5) * 2 * dt;
+            if (p.y > height + 20) p.y -= height + 40;
+          } else if (w === "snow") {
+            p.y += (1 + intensity) * dt;
+            p.x += Math.sin(Date.now() / 1000 + p.x) * 0.3 * dt;
+            if (p.y > height + 10) { p.y = -10; p.x = Math.random() * width; }
+          } else if (w === "fog") {
+            p.x += (0.1 + intensity * 0.2) * dt;
+            if (p.x > width + 50) p.x = -50;
+          }
+        }
+      });
+
+      const interval = setInterval(updateVisuals, 1000);
+
+      return () => {
+        clearInterval(interval);
+        if (app?.ticker) {
+          app.ticker.removeAllListeners();
+        }
+        cancelled = true;
+        if (app) {
+          app.canvas.parentNode?.removeChild(app.canvas);
+          app.destroy(true);
+        }
+      };
     })();
 
     function updateVisuals() {
       if (!groundRef.current || !overlayRef.current) return;
-
       const colors = getTimeOfDayColors(timeRef.current.hour);
+      const seasonName = seasonRef.current;
 
-      // Update ground
       const ground = groundRef.current;
       ground.clear();
       for (let x = 0; x < width; x += tileSize) {
         for (let y = 0; y < height; y += tileSize) {
           const variation = Math.random() * 0x080808;
-          const baseColor = colors.ground;
-          const color = baseColor + variation;
           ground.rect(x, y, tileSize, tileSize);
-          ground.fill(color);
+          ground.fill(colors.ground + variation);
         }
       }
 
-      // Update overlay (night darkness)
       const overlay = overlayRef.current;
       overlay.clear();
+
+      // Season tint
+      const seasonTint = SEASON_TINTS[seasonName] ?? 0xffffff;
+      if (seasonTint !== 0xffffff) {
+        overlay.rect(0, 0, width, height);
+        overlay.fill({ color: seasonTint, alpha: 0.08 });
+      }
+
+      // Night darkness
       const darkness = 1 - colors.lightLevel;
       if (darkness > 0) {
         overlay.rect(0, 0, width, height);
         overlay.fill({ color: 0x000020, alpha: darkness * 0.6 });
       }
 
-      // Tint buildings based on time
       buildingsContainerRef.current?.children.forEach((child) => {
         (child as PIXI.Container).alpha = colors.ambient;
       });
-
-      // Tint agents based on time
       agentsContainerRef.current?.children.forEach((child) => {
         (child as PIXI.Container).alpha = colors.ambient;
       });
     }
-
-    // Update visuals periodically
-    const interval = setInterval(updateVisuals, 1000);
-
-    return () => {
-      clearInterval(interval);
-      cancelled = true;
-      if (app) {
-        app.canvas.parentNode?.removeChild(app.canvas);
-        app.destroy(true);
-      }
-    };
   }, [width, height, tileSize]);
 
-  // Update buildings
   useEffect(() => {
     const container = buildingsContainerRef.current;
     if (!container) return;
-
     const sprites = buildingSpritesRef.current;
-
     buildings.forEach((building) => {
       let sprite = sprites.get(building.id);
-
       if (!sprite) {
         sprite = new PIXI.Container();
-
-        // Generate building sprite
-        const spriteUrl = getCachedSprite(
-          `building-${building.type}-${building.name}`,
-          () => generateBuildingSprite(building.type, building.name)
-        );
-
-        // Create sprite from data URL
+        const spriteUrl = getCachedSprite(`building-${building.type}-${building.name}`, () => generateBuildingSprite(building.type, building.name));
         const texture = PIXI.Texture.from(spriteUrl);
         const buildingSprite = new PIXI.Sprite(texture);
         buildingSprite.anchor.set(0.5);
         buildingSprite.scale.set(2);
         sprite.addChild(buildingSprite);
-
-        // Add label
-        const text = new PIXI.Text({
-          text: building.name,
-          style: {
-            fontSize: 11,
-            fill: 0xffffff,
-            fontFamily: "sans-serif",
-            stroke: { color: 0x000000, width: 3 },
-            dropShadow: true,
-            dropShadowColor: 0x000000,
-            dropShadowDistance: 1,
-          },
-        });
+        const text = new PIXI.Text({ text: building.name, style: { fontSize: 11, fill: 0xffffff, fontFamily: "sans-serif", stroke: { color: 0x000000, width: 3 }, dropShadow: true, dropShadowColor: 0x000000, dropShadowDistance: 1 } });
         text.anchor.set(0.5, 1);
         text.position.set(0, -20);
         sprite.addChild(text);
-
         container.addChild(sprite);
         sprites.set(building.id, sprite);
       }
-
-      // Update position
       sprite.x = building.x + building.width / 2;
       sprite.y = building.y + building.height / 2;
     });
-
-    // Remove unused sprites
     sprites.forEach((sprite, id) => {
-      if (!buildings.find((b) => b.id === id)) {
-        container.removeChild(sprite);
-        sprites.delete(id);
-      }
+      if (!buildings.find((b) => b.id === id)) { container.removeChild(sprite); sprites.delete(id); }
     });
   }, [buildings]);
 
-  // Update agents
   useEffect(() => {
     const container = agentsContainerRef.current;
     if (!container) return;
-
     const sprites = agentSpritesRef.current;
-
     agents.forEach((agent) => {
       let sprite = sprites.get(agent.id);
-
       if (!sprite) {
         sprite = new PIXI.Container();
-
-        // Generate agent sprite
-        const spriteUrl = getCachedSprite(`agent-${agent.id}`, () =>
-          generateAgentSprite({
-            name: agent.name,
-            occupation: agent.occupation,
-            seed: agent.name.split("").reduce((a, b) => a + b.charCodeAt(0), 0),
-          })
-        );
-
+        const spriteUrl = getCachedSprite(`agent-${agent.id}`, () => generateAgentSprite({ name: agent.name, occupation: agent.occupation, seed: agent.name.split("").reduce((a, b) => a + b.charCodeAt(0), 0) }));
         const texture = PIXI.Texture.from(spriteUrl);
         const agentSprite = new PIXI.Sprite(texture);
         agentSprite.anchor.set(0.5, 1);
         agentSprite.scale.set(1.5);
         sprite.addChild(agentSprite);
-
-        // Add name label
-        const nameText = new PIXI.Text({
-          text: agent.name,
-          style: {
-            fontSize: 10,
-            fill: 0xffffff,
-            fontFamily: "sans-serif",
-            stroke: { color: 0x000000, width: 3 },
-          },
-        });
+        const nameText = new PIXI.Text({ text: agent.name, style: { fontSize: 10, fill: 0xffffff, fontFamily: "sans-serif", stroke: { color: 0x000000, width: 3 } } });
         nameText.anchor.set(0.5, 1);
         nameText.position.set(0, -28);
         sprite.addChild(nameText);
-
-        // Add activity indicator
-        const activityText = new PIXI.Text({
-          text: agent.currentActivity,
-          style: {
-            fontSize: 8,
-            fill: 0xffffaa,
-            fontFamily: "sans-serif",
-            stroke: { color: 0x000000, width: 2 },
-          },
-        });
+        const activityText = new PIXI.Text({ text: agent.currentActivity, style: { fontSize: 8, fill: 0xffffaa, fontFamily: "sans-serif", stroke: { color: 0x000000, width: 2 } } });
         activityText.anchor.set(0.5, 0);
         activityText.position.set(0, 2);
         sprite.addChild(activityText);
-
-        // Store reference to update activity later
         (sprite as any).activityText = activityText;
-
-        // Make interactive
         sprite.eventMode = "static";
         sprite.cursor = "pointer";
-        sprite.on("pointerdown", () => {
-          onAgentClick?.(agent);
-        });
-
+        sprite.on("pointerdown", () => { onAgentClick?.(agent); });
         container.addChild(sprite);
         sprites.set(agent.id, sprite);
       }
-
-      // Update position
       sprite.x = agent.x;
       sprite.y = agent.y;
-
-      // Update activity text
       const activityText = (sprite as any).activityText as PIXI.Text;
-      if (activityText && activityText.text !== agent.currentActivity) {
-        activityText.text = agent.currentActivity;
-      }
+      if (activityText && activityText.text !== agent.currentActivity) { activityText.text = agent.currentActivity; }
     });
-
-    // Remove unused sprites
     sprites.forEach((sprite, id) => {
-      if (!agents.find((a) => a.id === id)) {
-        container.removeChild(sprite);
-        sprites.delete(id);
-      }
+      if (!agents.find((a) => a.id === id)) { container.removeChild(sprite); sprites.delete(id); }
     });
   }, [agents, onAgentClick]);
 
   return (
-    <div
-      ref={containerRef}
-      className="relative rounded-lg overflow-hidden border border-border shadow-lg"
-      style={{ width, height }}
-    />
+    <div ref={containerRef} className="relative rounded-lg overflow-hidden border border-border shadow-lg" style={{ width, height }} />
   );
 }

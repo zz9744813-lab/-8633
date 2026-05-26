@@ -22,6 +22,11 @@ export class World {
   agents: Map<string, Agent> = new Map();
   buildings: Building[] = [];
 
+  // I3: Weather state
+  currentWeather: "clear" | "rain" | "snow" | "fog" | "storm" = "clear";
+  weatherIntensity: number = 0;
+  weatherEndsAtTick: number = 0;
+
   private tickInterval: NodeJS.Timeout | null = null;
   private running: boolean = false;
   private onTickCallbacks: Array<(world: World) => void> = [];
@@ -106,6 +111,12 @@ export class World {
     const worldState = this.getWorldState();
     const { hour, minute } = this.getGameTime();
 
+    // === I3: Weather expiry ===
+    if (this.currentWeather !== "clear" && this.tickCount >= this.weatherEndsAtTick) {
+      this.currentWeather = "clear";
+      this.weatherIntensity = 0;
+    }
+
     // === G1.3: Daily health tick (midnight) ===
     if (hour === 0 && minute === 0) {
       for (const agent of this.agents.values()) {
@@ -179,6 +190,8 @@ export class World {
           await agent.generateDailyPlan(this.tickCount, {
             buildings: this.buildings,
             currentTime: worldState.currentTime,
+            weather: this.currentWeather,
+            weatherIntensity: this.weatherIntensity,
           });
         }
       }
@@ -332,6 +345,16 @@ export class World {
         this.eraPack
       );
 
+      // I3: Update world weather on weather events
+      if (event && event.type === "weather") {
+        const weatherTypes = ["rain", "snow", "fog", "storm"] as const;
+        const chosen = weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
+        this.currentWeather = chosen;
+        this.weatherIntensity = 0.2 + Math.random() * 0.6;
+        this.weatherEndsAtTick = this.tickCount + 144 * (1 + Math.floor(Math.random() * 3));
+        console.log(`[World] Weather changed to ${chosen} (intensity: ${this.weatherIntensity.toFixed(1)})`);
+      }
+
       // 把目击者写入 memory
       if (event) {
         // G1.4: Apply illness to sick agents
@@ -484,12 +507,18 @@ export class World {
 
   // Serialization for SSE
   toJSON() {
+    const dayOfYear = Math.floor(this.tickCount / 144) % 365;
+    const season = dayOfYear < 90 ? "spring" : dayOfYear < 180 ? "summer" : dayOfYear < 270 ? "autumn" : "winter";
+
     return {
       id: this.id,
       name: this.name,
       tick: this.tickCount,
       speed: this.speed,
       paused: this.paused,
+      season,
+      weather: this.currentWeather,
+      weatherIntensity: this.weatherIntensity,
       agents: Array.from(this.agents.entries()).map(([id, agent]) => ({
         id,
         identity: agent.identity,

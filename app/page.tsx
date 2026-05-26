@@ -36,6 +36,8 @@ interface WorldState {
   time: string;
   date: string;
   season: string;
+  weather: string;
+  weatherIntensity: number;
   agents: AgentState[];
   events: WorldEvent[];
 }
@@ -90,7 +92,9 @@ export default function Home() {
             tick: message.world.tick,
             time: formatGameTime(message.world.tick),
             date: `第 ${Math.floor(message.world.tick / 144) + 1} 年`,
-            season: getSeason(message.world.tick),
+            season: message.world.season ?? getSeason(message.world.tick),
+            weather: message.world.weather ?? "clear",
+            weatherIntensity: message.world.weatherIntensity ?? 0,
             agents: message.world.agents.map((a: { id: string; identity: { name: string }; state: { position: { x: number; y: number }; currentActivity: string; mood: number; energy: number } }) => ({
               id: a.id,
               name: a.identity.name,
@@ -239,6 +243,9 @@ export default function Home() {
             height={600}
             tileSize={10}
             agents={agentPositions}
+            weather={worldState?.weather}
+            weatherIntensity={worldState?.weatherIntensity}
+            season={worldState?.season}
             onAgentClick={(agent) => {
               const fullAgent = worldState?.agents.find((a) => a.name === agent.name);
               if (fullAgent) setSelectedAgent(fullAgent);

@@ -1,0 +1,103 @@
+id: mars_2080
+name: 2080火星殖民地
+yearStart: 2080
+calendar: earth_standard
+
+description: |
+  2080年的火星殖民地，人类已在火星建立永久定居点。
+  穹顶城市、水培农场、太阳能发电是标配。
+  地球与火星通信延迟约20分钟。
+
+worldPrompt: |
+  你生活在2080年的火星殖民地，居住在圆顶加压城市内。
+  火星重力只有地球的38%，你习惯了轻飘飘的步伐。
+  每天你都要检查氧气水平和辐射警报。
+  从穹顶窗户可以看到红色沙漠和远处的奥林匹斯山。
+  地球被称为"蓝星"，你只在全息影像中见过它。
+
+occupations:
+  - id: engineer
+    name: 生命支持系统工程师
+    workplace: control_center
+    description: 维护氧气循环、水循环和温度调节系统
+  - id: botanist
+    name: 水培农场技术员
+    workplace: greenhouse
+    description: 在人工光照下种植土豆、生菜和番茄
+  - id: geologist
+    name: 行星地质学家
+    workplace: lab
+    description: 分析火星岩石样本，寻找水冰资源
+  - id: medic
+    name: 太空医生
+    workplace: medical
+    description: 处理低重力环境下的健康问题
+  - id: pilot
+    name: 火星车驾驶员
+    workplace: garage
+    description: 驾驶勘探车探索火星表面
+  - id: teacher
+    name: 殖民地教师
+    workplace: school
+    description: 教育在火星出生的第一代孩子
+
+buildingTypes:
+  - id: dome
+    name: 居住穹顶
+    visual: "🌐 透明聚合物穹顶，内部是绿色生态圈"
+    type: residential
+  - id: greenhouse
+    name: 水培农场
+    visual: "🌱 多层种植架，紫色生长灯下绿意盎然"
+    type: agricultural
+  - id: solar_array
+    name: 太阳能阵列
+    visual: "☀️ 大片黑色光伏板，追踪太阳角度"
+    type: energy
+  - id: control_center
+    name: 指挥中心
+    visual: "🖥️ 满是屏幕的房间，显示各种系统状态"
+    type: operational
+  - id: garage
+    name: 车辆库
+    visual: "🚗 加压车库，停着几辆火星勘探车"
+    type: industrial
+
+clothingPalette:
+  male:
+    - "白色/橙色连体工作服"
+    - "磁吸靴"
+    - "通讯耳机"
+    - "紫外线防护眼镜"
+  female:
+    - "白色/橙色连体工作服"
+    - "磁吸靴"
+    - "通讯耳机"
+    - "紫外线防护眼镜"
+  forbidden:
+    - "自然纤维衣物"
+    - "敞开式鞋子"
+    - "没有辐射防护的衣物"
+
+dialogueStyle: |
+  使用科幻风格的专业术语：
+  - 提及氧气水平、辐射、系统状态
+  - 使用火星特有的词汇：穹顶、红土、蓝星（地球）
+  - 语气务实、略带孤独感
+  - 避免提及地球才有的日常事物
+
+forbiddenConcepts:
+  - 雨水
+  - 树木
+  - 动物
+  - 开放天空
+  - 季节变化
+  - 汽车
+  - 火车
+  - 船
+
+startingConditions:
+  population: 20
+  season: dust_season
+  hour: 8
+  weather: clear

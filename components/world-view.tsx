@@ -9,6 +9,7 @@ interface WorldViewProps {
   tileSize?: number;
   agents?: Array<{ x: number; y: number; name: string }>;
   buildings?: Array<{ x: number; y: number; name: string }>;
+  dialogues?: Array<{ agentName: string; message: string; timestamp: number }>;
   onAgentClick?: (agent: { x: number; y: number; name: string }) => void;
 }
 

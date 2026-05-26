@@ -5,6 +5,8 @@ import { WorldView } from "@/components/world-view";
 import { TimeBar, GameSpeed } from "@/components/time-bar";
 import { ConfigPanel } from "@/components/config-panel";
 import { MemoryViewer } from "@/components/memory-viewer";
+import { EventLog } from "@/components/event-log";
+import { DialogueManager } from "@/components/dialogue-bubble";
 import { cn } from "@/lib/utils";
 import { Settings, Activity, Brain } from "lucide-react";
 
@@ -18,13 +20,22 @@ interface AgentState {
   energy: number;
 }
 
+interface WorldEvent {
+  id: string;
+  tick: number;
+  time: string;
+  type: "weather" | "festival" | "disaster" | "arrival" | "social" | "intervention";
+  description: string;
+  severity?: "low" | "medium" | "high";
+}
+
 interface WorldState {
   tick: number;
   time: string;
   date: string;
   season: string;
   agents: AgentState[];
-  events: string[];
+  events: WorldEvent[];
 }
 
 function formatGameTime(tick: number): string {
@@ -286,21 +297,18 @@ export default function Home() {
           )}
 
           {/* Recent events */}
-          <div className="flex-1">
-            <h3 className="font-medium mb-3 text-sm">世界事件</h3>
-            <div className="space-y-2">
-              {worldState?.events.slice(0, 5).map((event, i) => (
-                <div
-                  key={i}
-                  className="p-2 text-xs bg-muted rounded-md text-muted-foreground"
-                >
-                  {event}
-                </div>
-              )) || (
-                <div className="text-xs text-muted-foreground">等待事件...</div>
-              )}
-            </div>
-          </div>
+          <EventLog
+            events={[
+              {
+                id: "1",
+                tick: worldState?.tick || 0,
+                time: worldState?.time || "08:00",
+                type: "social",
+                description: "新的一天开始了",
+              },
+            ]}
+            maxHeight={200}
+          />
 
           {/* Agent list */}
           <div>

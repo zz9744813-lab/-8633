@@ -1,0 +1,114 @@
+id: edo_japan
+name: 江户时代宿场町
+yearStart: 1750
+calendar: japanese_lunar
+
+description: |
+  江户时代的日本宿场町（驿站城镇）。
+  位于连接江户和京都的东海道上。
+  旅人、商人、武士往来不息。
+  歌舞伎、相扑、浮世绘盛行。
+
+worldPrompt: |
+  你生活在江户时代的宿场町。
+  这是德川幕府统治下的和平时期。
+  町的东边是武士区，中间是商店街，西边是平民区。
+  每天都有旅人带着行李在街道上行走。
+  你能听到木屐敲击地面的声音。
+  寺庙的钟声每天定时敲响。
+  科技水平：和纸、木版印刷、火绳枪。
+  社会规范：士农工商四民分治，重视礼仪和等级。
+
+occupations:
+  - id: samurai
+    name: 下级武士
+    workplace: samurai_quarter
+    description: 领主的家臣，负责治安和行政
+  - id: merchant
+    name: 町人商人
+    workplace: shop
+    description: 经营绸缎、茶叶或干货
+  - id: innkeeper
+    name: 旅笼屋主人
+    workplace: inn
+    description: 为旅人提供住宿和餐食
+  - id: artisan
+    name: 职人
+    workplace: workshop
+    description: 制作木屐、雨伞、陶瓷等
+  - id: priest
+    name: 僧侣
+    workplace: temple
+    description: 在寺庙修行，为信众诵经
+  - id: entertainer
+    name: 芸者
+    workplace: teahouse
+    description: 在茶屋表演三味线和舞蹈
+  - id: farmer
+    name: 农民
+    workplace: field
+    description: 在城外种植水稻和蔬菜
+
+buildingTypes:
+  - id: machiya
+    name: 町家
+    visual: "🏯 木造建筑，格子窗，瓦屋顶"
+    type: residential
+  - id: inn
+    name: 旅笼屋
+    visual: "🏨 两层建筑，门口挂着暖帘"
+    type: commercial
+  - id: temple
+    name: 寺庙
+    visual: "⛩️ 山门上挂着灯笼，院内古木参天"
+    type: religious
+  - id: shop
+    name: 店铺
+    visual: "🏪 格子门，屋檐下挂着招牌"
+    type: commercial
+  - id: samurai_quarter
+    name: 武家屋敷
+    visual: "🏛️ 高墙深院，门前有武士站岗"
+    type: residential
+
+clothingPalette:
+  male:
+    - "和服"
+    - "羽织"
+    - "袴"
+    - "木屐"
+    - "丁髷发型"
+  female:
+    - "着物"
+    - "带"
+    - "草履"
+    - "岛田发型"
+  forbidden:
+    - "西装"
+    - "短发"
+    - "洋装"
+    - "现代发型"
+
+dialogueStyle: |
+  使用江户时代的日语风格：
+  - 使用敬语：ござる、でござる、候
+  - 武士用语：拙者、某
+  - 商人用语：おいら、あっし
+  - 提及歌舞伎、浮世绘、相扑
+  - 避免现代词汇
+
+forbiddenConcepts:
+  - 电力
+  - 汽车
+  - 电话
+  - 飞机
+  - 塑料
+  - 牛仔裤
+  - 民主
+  - 平等主义
+
+startingConditions:
+  population: 40
+  season: spring
+  hour: 6
+  weather: clear

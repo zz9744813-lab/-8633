@@ -108,6 +108,11 @@ forbiddenConcepts:
   - 民主
   - 平等主义
 
+illnesses:
+  - { name: 風邪, severityRange: [0.2, 0.5] }
+  - { name: 疫癘, severityRange: [0.6, 0.9] }
+  - { name: 労咳, severityRange: [0.3, 0.6] }
+
 startingConditions:
   population: 40
   season: spring

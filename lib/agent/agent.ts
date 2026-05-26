@@ -69,11 +69,12 @@ export class Agent {
       id,
       name: identity.name,
       position: initialPosition,
-      status: "idle",
+      status: "alive",
       currentActivity: "idle",
       energy: 70,
       mood: 50,
       stress: 30,
+      health: 1.0,
       currentGoals: identity.initialGoals ?? [],
     };
   }
@@ -132,7 +133,7 @@ ${this.eraPack.forbiddenConcepts.join("、")}
 价值观：${this.identity.personality.values.join("、")}
 背景：${this.identity.backstory ?? ""}
 
-[当前状态] energy: ${this.state.energy}, mood: ${this.state.mood}, stress: ${this.state.stress}
+[当前状态] energy: ${this.state.energy}, mood: ${this.state.mood}, stress: ${this.state.stress}, health: ${(this.state.health * 100).toFixed(0)}%, status: ${this.state.status}${this.state.illness ? `, 患病: ${this.state.illness.name}` : ""}
 
 [长期目标]
 ${this.state.currentGoals.length > 0
@@ -306,7 +307,7 @@ ${this.eraPack.forbiddenConcepts.join("、")}
 价值观：${this.identity.personality.values.join("、")}
 背景：${this.identity.backstory ?? ""}
 
-[当前状态] energy: ${this.state.energy}, mood: ${this.state.mood}, stress: ${this.state.stress}
+[当前状态] energy: ${this.state.energy}, mood: ${this.state.mood}, stress: ${this.state.stress}, health: ${(this.state.health * 100).toFixed(0)}%, status: ${this.state.status}${this.state.illness ? `, 患病: ${this.state.illness.name}` : ""}
 
 [相关记忆]
 ${relevantMemories.length > 0
@@ -361,6 +362,9 @@ What do you want to do next?`;
     },
     dt: number = 1
   ): boolean {
+    // Dead agents do nothing
+    if (this.state.status === "dead") return true;
+
     switch (action.type) {
       case "MOVE_TO": {
         if (!action.targetId) {

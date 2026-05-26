@@ -115,6 +115,11 @@ forbiddenConcepts:
   - 女权主义
   - 社会主义
 
+illnesses:
+  - { name: 风寒, severityRange: [0.2, 0.5] }
+  - { name: 疫病, severityRange: [0.6, 0.9] }
+  - { name: 旧伤复发, severityRange: [0.3, 0.6] }
+
 startingConditions:
   population: 50
   season: spring

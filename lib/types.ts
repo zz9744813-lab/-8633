@@ -35,10 +35,18 @@ export type AgentState = {
   energy: number;
   mood: number;
   stress: number;
+  health: number;
   status: AgentStatus;
   targetPosition?: Position | null;
   insideBuildingId?: string | null;
   currentGoals?: string[]; // F2: Long-term goals
+  illness?: {
+    name: string;
+    severity: number;
+    startTick: number;
+    estimatedDuration: number;
+  };
+  deathTick?: number;
 };
 
 // ============ Time Types ============

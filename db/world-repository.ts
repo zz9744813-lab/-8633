@@ -130,6 +130,7 @@ export class WorldRepository {
           mood: agent.state.mood,
           stress: agent.state.stress,
           status: agent.state.status,
+          health: agent.state.health,
           x: agent.state.position.x,
           y: agent.state.position.y,
           updatedAt: now,
@@ -207,19 +208,25 @@ export class WorldRepository {
         y: a.positionY ?? a.y ?? 0,
       };
 
+      const loadedState = (a.state as AgentState) || {
+        id: a.id,
+        name: a.name,
+        position,
+        currentActivity: a.currentActivity ?? "idle",
+        energy: a.energy ?? 70,
+        mood: a.mood ?? 50,
+        stress: a.stress ?? 30,
+        health: 1.0,
+        status: "alive",
+      };
+      // Ensure backward compatibility for agents saved before G1
+      if (loadedState.health === undefined) loadedState.health = 1.0;
+      if (!loadedState.status) loadedState.status = "alive";
+
       return {
         id: a.id,
         identity,
-        state: (a.state as AgentState) || {
-          id: a.id,
-          name: a.name,
-          position,
-          currentActivity: a.currentActivity ?? "idle",
-          energy: a.energy ?? 70,
-          mood: a.mood ?? 50,
-          stress: a.stress ?? 30,
-          status: (a.status as "alive" | "sick" | "dead") || "alive",
-        },
+        state: loadedState,
         dailyPlan: (a.dailyPlan as DailyPlan | null) ?? null,
         lastPlanTick: a.lastPlanTick ?? 0,
       };

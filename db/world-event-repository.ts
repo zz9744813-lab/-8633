@@ -3,7 +3,7 @@ import { worldEvents } from "./schema";
 import { eq, desc } from "drizzle-orm";
 import { getLLMClient } from "@/lib/llm/client";
 
-export type WorldEventType = "weather" | "festival" | "disaster" | "intervention" | "news";
+export type WorldEventType = "weather" | "festival" | "disaster" | "intervention" | "news" | "illness";
 
 export interface WorldEvent {
   id: string;
@@ -95,6 +95,27 @@ export class WorldEventSystem {
     }
 
     const llm = getLLMClient();
+
+    // 15% chance for illness event
+    if (Math.random() < 0.15) {
+      const numSick = Math.max(1, Math.floor(agentIds.length * 0.3));
+      const shuffled = [...agentIds].sort(() => Math.random() - 0.5);
+      const sickAgents = shuffled.slice(0, Math.min(3, numSick));
+
+      const description = sickAgents.length > 1
+        ? `镇上多人染病，包括 ${sickAgents.length} 位居民`
+        : `镇上有人染病`;
+
+      return await this.createEvent(
+        worldId,
+        tick,
+        "illness",
+        description,
+        sickAgents,
+        { sickAgentIds: sickAgents },
+        6
+      );
+    }
 
     const eventTypes: WorldEventType[] = ["weather", "festival", "disaster", "news"];
     const type = eventTypes[Math.floor(Math.random() * eventTypes.length)];

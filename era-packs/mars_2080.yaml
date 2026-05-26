@@ -97,6 +97,11 @@ forbiddenConcepts:
   - 火车
   - 船
 
+illnesses:
+  - { name: 辐射病, severityRange: [0.5, 0.9] }
+  - { name: 低压综合症, severityRange: [0.3, 0.6] }
+  - { name: 心理崩溃, severityRange: [0.4, 0.7] }
+
 startingConditions:
   population: 20
   season: dust_season

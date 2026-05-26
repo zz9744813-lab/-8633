@@ -106,8 +106,66 @@ export class World {
     const worldState = this.getWorldState();
     const { hour, minute } = this.getGameTime();
 
+    // === G1.3: Daily health tick (midnight) ===
+    if (hour === 0 && minute === 0) {
+      for (const agent of this.agents.values()) {
+        if (agent.state.status === "dead") continue;
+
+        // Age-related decay
+        const ageDecay = (agent.identity.age / 100) * 0.002;
+        agent.state.health = Math.max(0, agent.state.health - ageDecay);
+
+        // Illness accelerates decay
+        if (agent.state.illness) {
+          agent.state.health = Math.max(0, agent.state.health - agent.state.illness.severity * 0.01);
+
+          // Self-heal check
+          if (this.tickCount - agent.state.illness.startTick > agent.state.illness.estimatedDuration) {
+            agent.state.illness = undefined;
+            if (agent.state.status === "sick") {
+              agent.state.status = "alive";
+            }
+          }
+        }
+
+        // Death check
+        if (agent.state.health <= 0 && agent.state.status !== "dead") {
+          agent.state.status = "dead";
+          agent.state.deathTick = this.tickCount;
+          const cause = agent.state.illness?.name ?? "年老";
+          await chronicleEngine.recordDeath(this, agent, cause);
+
+          // Notify close friends (affinity > 0.5)
+          try {
+            const relations = await agent.getAllRelationships();
+            for (const rel of relations) {
+              if (rel.affinity > 0.5) {
+                await memoryManager.addMemory({
+                  agentId: rel.toAgentId,
+                  type: "event",
+                  content: `${agent.identity.name} 去世了。`,
+                  importance: 0.9,
+                  tick: this.tickCount,
+                  relatedAgentIds: [agent.id],
+                });
+              }
+            }
+          } catch (e) {
+            console.error("[World] Failed to notify death:", e);
+          }
+
+          console.log(`[World] ${agent.identity.name} has died at age ${agent.identity.age} (${cause})`);
+        }
+      }
+    }
+
+    // === G1.4: Process illness events from world events ===
+    // (illness is applied to witness agents when the event is processed below)
+
     // Each agent perceives, plans (if needed), and executes
     for (const agent of this.agents.values()) {
+      // Skip dead agents
+      if (agent.state.status === "dead") continue;
       // Check if agent needs a new daily plan
       if (agent.needsPlan(this.tickCount, hour)) {
         // Stagger planning to avoid simultaneous LLM calls
@@ -276,6 +334,38 @@ export class World {
 
       // 把目击者写入 memory
       if (event) {
+        // G1.4: Apply illness to sick agents
+        if (event.type === "illness") {
+          const sickIds = (event.payload as any)?.sickAgentIds as string[] ?? event.witnessIds;
+          for (const sickId of sickIds) {
+            const sickAgent = this.agents.get(sickId);
+            if (sickAgent && sickAgent.state.status === "alive") {
+              const illnesses = this.eraPack?.illnesses ?? [
+                { name: "风寒", severityRange: [0.2, 0.5] },
+                { name: "疫病", severityRange: [0.6, 0.9] },
+                { name: "旧伤复发", severityRange: [0.3, 0.6] },
+              ];
+              const illness = illnesses[Math.floor(Math.random() * illnesses.length)];
+              const severity = illness.severityRange[0] + Math.random() * (illness.severityRange[1] - illness.severityRange[0]);
+              sickAgent.state.illness = {
+                name: illness.name,
+                severity,
+                startTick: this.tickCount,
+                estimatedDuration: 144 * (3 + Math.floor(Math.random() * 7)), // 3-10 days
+              };
+              sickAgent.state.status = "sick";
+              await memoryManager.addMemory({
+                agentId: sickId,
+                type: "observation",
+                content: `你感染了${illness.name}。`,
+                importance: 0.7,
+                tick: this.tickCount,
+              });
+              console.log(`[World] ${sickAgent.identity.name} is sick with ${illness.name}`);
+            }
+          }
+        }
+
         for (const witnessId of event.witnessIds) {
           await memoryManager.addMemory({
             agentId: witnessId,

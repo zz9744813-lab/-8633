@@ -65,6 +65,7 @@ export const agents = sqliteTable("agents", {
   workplaceId: text("workplace_id"),
   x: real("x"),
   y: real("y"),
+  health: real("health").default(1.0),
   status: text("status").default("alive"), // alive/sick/dead
 
   // Bookkeeping

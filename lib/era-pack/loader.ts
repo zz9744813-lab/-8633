@@ -43,6 +43,14 @@ const EraPackSchema = z.object({
     }),
     personalityTemplates: z.array(z.array(z.string())),
   }),
+  illnesses: z.array(z.object({
+    name: z.string(),
+    severityRange: z.array(z.number()).length(2),
+  })).default([
+    { name: "风寒", severityRange: [0.2, 0.5] },
+    { name: "疫病", severityRange: [0.6, 0.9] },
+    { name: "旧伤复发", severityRange: [0.3, 0.6] },
+  ]),
 });
 
 export type EraPack = z.infer<typeof EraPackSchema>;

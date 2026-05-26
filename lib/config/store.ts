@@ -26,6 +26,9 @@ export interface AppConfig {
   gameMinutesPerTick: number;
   maxAgents: number;
 
+  // World
+  eraPackId?: string;
+
   // Features
   enableVectorSearch: boolean;
   enableReflections: boolean;

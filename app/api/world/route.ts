@@ -9,7 +9,10 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, worldId = "default-world", eraPackId = "18th_england", width = 800, height = 600, population = 3 } = body;
+    const { name, worldId, eraPackId = "18th_england", width = 800, height = 600, population = 3 } = body;
+
+    // Generate a unique worldId if not provided
+    const id = worldId || `world-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
 
     if (!name) {
       return NextResponse.json({ error: "World name is required" }, { status: 400 });
@@ -21,22 +24,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Era pack not found" }, { status: 404 });
     }
 
-    // Destroy existing world if any (saves current state first)
+    // Save current world state before switching
     const current = getWorld();
-    if (current) {
+    if (current && current.id !== id) {
       current.stop();
-      // Save the current world state before destroying
       try {
         const { worldRepository } = await import("@/db/world-repository");
         await worldRepository.saveWorld(current);
       } catch (e) {
-        console.error("[World] Failed to save before destroy:", e);
+        console.error("[World] Failed to save before switch:", e);
       }
     }
-    destroyWorld();
 
-    // Create or load world with stable ID
-    const world = await createWorldOrLoad(worldId, name, width, height, eraPack);
+    // Create or load world
+    const world = await createWorldOrLoad(id, name, width, height, eraPack);
 
     // If world was loaded from DB, skip buildings/agents (already have them)
     if (world.agents.size > 0) {
@@ -106,13 +107,14 @@ export async function GET() {
   let world = getWorld();
 
   if (!world) {
-    // Try loading from DB on server restart
     try {
       const { worldRepository } = await import("@/db/world-repository");
-      if (await worldRepository.worldExists("default-world")) {
+      const worlds = await worldRepository.listWorlds();
+      if (worlds.length > 0) {
+        const latest = worlds[0];
         const { createWorldOrLoad } = await import("@/lib/agent");
-        world = await createWorldOrLoad("default-world", "", 800, 600, null);
-        console.log(`[World] Loaded from DB on GET: ${world?.agents.size ?? 0} agents at tick ${world?.tickCount}`);
+        world = await createWorldOrLoad(latest.id, latest.name, latest.width, latest.height, null);
+        console.log(`[World] Loaded latest world "${latest.name}" from DB: ${world?.agents.size ?? 0} agents at tick ${world?.tickCount}`);
       }
     } catch (e) {
       console.error("[World] Failed to load from DB:", e);

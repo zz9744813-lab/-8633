@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, X, Key, Database, Users, Cpu, Shield, Globe } from "lucide-react";
+import { Settings, X, Key, Database, Users, Cpu, Shield, Globe, Trash2, Play, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AppConfig,
@@ -29,11 +29,33 @@ export function ConfigPanel({ isOpen, onClose, onConfigChange }: ConfigPanelProp
   const [config, setConfig] = useState<AppConfig>(loadConfig());
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [isCreating, setIsCreating] = useState(false);
+  const [worlds, setWorlds] = useState<{ id: string; name: string; tickCount: number; updatedAt: string }[]>([]);
+  const [worldName, setWorldName] = useState("");
+  const [loadingWorlds, setLoadingWorlds] = useState(false);
 
   // Load config on mount
   useEffect(() => {
     setConfig(loadConfig());
   }, []);
+
+  // Fetch worlds when panel opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchWorlds();
+    }
+  }, [isOpen]);
+
+  const fetchWorlds = async () => {
+    setLoadingWorlds(true);
+    try {
+      const res = await fetch("/api/worlds");
+      if (res.ok) {
+        const data = await res.json();
+        setWorlds(data.worlds || []);
+      }
+    } catch { /* ignore */ }
+    setLoadingWorlds(false);
+  };
 
   const updateConfig = (updates: Partial<AppConfig>) => {
     const newConfig = { ...config, ...updates };
@@ -81,13 +103,14 @@ export function ConfigPanel({ isOpen, onClose, onConfigChange }: ConfigPanelProp
         return;
       }
 
+      const name = worldName.trim() || `世界-${Date.now()}`;
+
       const response = await fetch("/api/world", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: "新世界",
-          worldId: "default-world",
-          eraPackId: "18th_england",
+          name,
+          eraPackId: config.eraPackId || "18th_england",
           population: config.maxAgents,
         }),
       });
@@ -95,7 +118,9 @@ export function ConfigPanel({ isOpen, onClose, onConfigChange }: ConfigPanelProp
       if (response.ok) {
         const data = await response.json();
         console.log("World created:", data);
-        alert(`世界创建成功！已生成 ${config.maxAgents} 个居民`);
+        alert(`世界 "${name}" 创建成功！已生成 ${config.maxAgents} 个居民`);
+        setWorldName("");
+        fetchWorlds();
       } else {
         const error = await response.json();
         alert(`创建失败: ${error.error}`);
@@ -105,6 +130,34 @@ export function ConfigPanel({ isOpen, onClose, onConfigChange }: ConfigPanelProp
       alert("创建世界时出错");
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleSwitchWorld = async (id: string) => {
+    try {
+      const res = await fetch("/api/world", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "switch", worldId: id, population: 0 }),
+      });
+      if (res.ok) {
+        alert("世界切换成功");
+        window.location.reload();
+      }
+    } catch (e) {
+      console.error("Failed to switch world:", e);
+    }
+  };
+
+  const handleDeleteWorld = async (id: string) => {
+    if (!confirm("确定要删除这个世界吗？所有数据将丢失。")) return;
+    try {
+      const res = await fetch(`/api/worlds?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchWorlds();
+      }
+    } catch (e) {
+      console.error("Failed to delete world:", e);
     }
   };
 
@@ -370,68 +423,110 @@ export function ConfigPanel({ isOpen, onClose, onConfigChange }: ConfigPanelProp
 
           {activeTab === "world" && (
             <div className="space-y-4">
+              {/* World List */}
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  时代包
-                </label>
-                <select className="w-full px-3 py-2 rounded-md border border-input bg-background">
-                  {eraPacks.map((e) => (
-                    <option key={e.value} value={e.value}>
-                      {e.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Tick 频率 (Hz): {config.tickRateHz}
-                </label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="5"
-                  step="0.1"
-                  value={config.tickRateHz}
-                  onChange={(e) =>
-                    updateConfig({ tickRateHz: Number(e.target.value) })
-                  }
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>慢</span>
-                  <span>快</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  游戏分钟/Tick: {config.gameMinutesPerTick}
-                </label>
-                <input
-                  type="range"
-                  min="1"
-                  max="60"
-                  value={config.gameMinutesPerTick}
-                  onChange={(e) =>
-                    updateConfig({ gameMinutesPerTick: Number(e.target.value) })
-                  }
-                  className="w-full"
-                />
-              </div>
-
-              <button
-                onClick={handleCreateWorld}
-                disabled={isCreating}
-                className={cn(
-                  "w-full px-4 py-2 rounded-md font-medium transition-colors",
-                  isCreating
-                    ? "bg-muted text-muted-foreground cursor-not-allowed"
-                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                <h4 className="font-medium text-sm mb-2 flex items-center justify-between">
+                  <span>已有世界 ({worlds.length})</span>
+                  <button onClick={fetchWorlds} className="text-xs text-primary hover:underline" disabled={loadingWorlds}>
+                    {loadingWorlds ? "加载中..." : "刷新"}
+                  </button>
+                </h4>
+                {worlds.length === 0 ? (
+                  <div className="p-3 bg-muted rounded-md text-sm text-muted-foreground">
+                    {loadingWorlds ? "加载中..." : "暂无存档，创建第一个世界"}
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {worlds.map((w) => (
+                      <div key={w.id} className="flex items-center justify-between p-2 bg-muted rounded-md text-sm">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{w.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            Tick {w.tickCount} · {w.updatedAt ? new Date(w.updatedAt).toLocaleDateString() : ""}
+                          </div>
+                        </div>
+                        <div className="flex gap-1 ml-2">
+                          <button
+                            onClick={() => handleSwitchWorld(w.id)}
+                            className="p-1.5 rounded hover:bg-background text-primary"
+                            title="切换到这个世界"
+                          >
+                            <Play className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteWorld(w.id)}
+                            className="p-1.5 rounded hover:bg-background text-destructive"
+                            title="删除"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
-              >
-                {isCreating ? "创建中..." : "创建世界"}
-              </button>
+              </div>
+
+              {/* Create New World */}
+              <div className="border-t pt-4 space-y-3">
+                <h4 className="font-medium text-sm">创建新世界</h4>
+                <div>
+                  <label className="block text-sm font-medium mb-2">时代包</label>
+                  <select
+                    className="w-full px-3 py-2 rounded-md border border-input bg-background"
+                    value={config.eraPackId || "18th_england"}
+                    onChange={(e) => updateConfig({ eraPackId: e.target.value })}
+                  >
+                    {eraPacks.map((e) => (
+                      <option key={e.value} value={e.value}>{e.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">世界名称</label>
+                  <input
+                    value={worldName}
+                    onChange={(e) => setWorldName(e.target.value)}
+                    placeholder="输入世界名称..."
+                    className="w-full px-3 py-2 rounded-md border border-input bg-background"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Tick 频率 (Hz): {config.tickRateHz}</label>
+                  <input
+                    type="range" min="0.1" max="5" step="0.1"
+                    value={config.tickRateHz}
+                    onChange={(e) => updateConfig({ tickRateHz: Number(e.target.value) })}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>慢</span>
+                    <span>快</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">游戏分钟/Tick: {config.gameMinutesPerTick}</label>
+                  <input
+                    type="range" min="1" max="60"
+                    value={config.gameMinutesPerTick}
+                    onChange={(e) => updateConfig({ gameMinutesPerTick: Number(e.target.value) })}
+                    className="w-full"
+                  />
+                </div>
+                <button
+                  onClick={handleCreateWorld}
+                  disabled={isCreating}
+                  className={cn(
+                    "w-full px-4 py-2 rounded-md font-medium transition-colors flex items-center justify-center gap-2",
+                    isCreating
+                      ? "bg-muted text-muted-foreground cursor-not-allowed"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90"
+                  )}
+                >
+                  <Plus className="w-4 h-4" />
+                  {isCreating ? "创建中..." : "创建世界"}
+                </button>
+              </div>
             </div>
           )}
 

@@ -4,6 +4,7 @@ import { worldRepository } from "@/db/world-repository";
 
 // Global world instance
 let currentWorld: World | null = null;
+const worldRegistry = new Map<string, World>();
 
 export function createWorld(
   id: string,
@@ -12,7 +13,9 @@ export function createWorld(
   height: number = 600,
   eraPack: EraPack | null = null
 ): World {
+  destroyCurrentWorld();
   currentWorld = new World(id, name, width, height, eraPack);
+  worldRegistry.set(id, currentWorld);
   return currentWorld;
 }
 
@@ -23,18 +26,28 @@ export async function createWorldOrLoad(
   height: number = 600,
   eraPack: EraPack | null = null
 ): Promise<World> {
-  // Try to load existing world
+  // If already in registry and loaded, just switch
+  if (worldRegistry.has(id)) {
+    currentWorld = worldRegistry.get(id)!;
+    return currentWorld;
+  }
+
+  // Try to load existing world from DB
   const existing = await worldRepository.loadWorld(id);
   if (existing) {
     console.log("[World] Loading existing world:", id);
     const world = await worldRepository.reconstructWorld(existing);
+    destroyCurrentWorld();
     currentWorld = world;
+    worldRegistry.set(id, world);
     return world;
   }
 
   // Create new world
   console.log("[World] Creating new world:", id);
+  destroyCurrentWorld();
   currentWorld = new World(id, name, width, height, eraPack);
+  worldRegistry.set(id, currentWorld);
   return currentWorld;
 }
 
@@ -43,12 +56,36 @@ export function getWorld(): World | null {
 }
 
 export function setWorld(world: World): void {
+  currentWorld?.stop();
   currentWorld = world;
+  worldRegistry.set(world.id, world);
+}
+
+export async function switchWorld(id: string): Promise<World | null> {
+  // Save current world first
+  if (currentWorld) {
+    currentWorld.stop();
+    try { await worldRepository.saveWorld(currentWorld); } catch (e) {
+      console.error("[World] Failed to save current world:", e);
+    }
+  }
+
+  // Load target world
+  const loaded = await createWorldOrLoad(id, "", 800, 600);
+  if (loaded) {
+    loaded.start();
+  }
+  return loaded;
+}
+
+export function destroyCurrentWorld(): void {
+  if (currentWorld) {
+    currentWorld.stop();
+    worldRegistry.delete(currentWorld.id);
+    currentWorld = null;
+  }
 }
 
 export function destroyWorld(): void {
-  if (currentWorld) {
-    currentWorld.stop();
-    currentWorld = null;
-  }
+  destroyCurrentWorld();
 }

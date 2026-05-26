@@ -5,12 +5,20 @@ import { relations } from "drizzle-orm";
 export const worlds = sqliteTable("worlds", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  eraPackId: text("era_pack_id").notNull(),
-  seed: integer("seed").notNull(),
+  eraPackId: text("era_pack_id"),
+  seed: integer("seed").notNull().default(0),
   currentTick: integer("current_tick").default(0),
+  tickCount: integer("tick_count").default(0),
   yearOffset: integer("year_offset").default(0),
+  // World dimensions
+  width: integer("width").notNull().default(100),
+  height: integer("height").notNull().default(100),
+  // Simulation state
+  speed: integer("speed").default(1),
+  paused: integer("paused", { mode: "boolean" }).default(false),
   config: text("config", { mode: "json" }).$type<WorldConfig>(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }),
 });
 
 export type WorldConfig = {
@@ -25,7 +33,7 @@ export const agents = sqliteTable("agents", {
   id: text("id").primaryKey(),
   worldId: text("world_id").references(() => worlds.id).notNull(),
 
-  // Identity
+  // Basic info
   name: text("name").notNull(),
   age: integer("age").notNull(),
   gender: text("gender"),
@@ -37,12 +45,22 @@ export const agents = sqliteTable("agents", {
     quirks: string[];
   }>(),
 
+  // Serialized identity/state for persistence
+  identity: text("identity", { mode: "json" }),
+  state: text("state", { mode: "json" }),
+  dailyPlan: text("daily_plan", { mode: "json" }),
+  lastPlanTick: integer("last_plan_tick").default(0),
+
+  // Position (denormalized for easy access)
+  positionX: real("position_x").default(0),
+  positionY: real("position_y").default(0),
+
   // Visual
   spriteUrl: text("sprite_url"),
   portraitUrl: text("portrait_url"),
   paletteHash: text("palette_hash"),
 
-  // State
+  // State (denormalized for easy queries)
   homeId: text("home_id"),
   workplaceId: text("workplace_id"),
   x: real("x"),
@@ -53,11 +71,14 @@ export const agents = sqliteTable("agents", {
   bornTick: integer("born_tick"),
   diedTick: integer("died_tick"),
 
-  // Current state
+  // Current state (denormalized)
   currentActivity: text("current_activity").default("idle"),
   energy: real("energy").default(70),
   mood: real("mood").default(50),
   stress: real("stress").default(30),
+
+  // Timestamps
+  updatedAt: integer("updated_at", { mode: "timestamp" }),
 });
 
 // ============ Memories ============
@@ -95,6 +116,10 @@ export const buildings = sqliteTable("buildings", {
   y: integer("y"),
   w: integer("w"),
   h: integer("h"),
+  width: integer("width").default(1),
+  height: integer("height").default(1),
+  position: text("position", { mode: "json" }), // {x, y}
+  description: text("description"),
   ownerId: text("owner_id"),
   state: text("state", { mode: "json" }),
 });

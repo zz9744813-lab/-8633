@@ -2,6 +2,9 @@ import { z } from "zod";
 import { AgentIdentity, AgentState, Position, Memory, Action } from "@/lib/types";
 import { EraPack } from "@/lib/era-pack/loader";
 import { getLLMClient } from "@/lib/llm/client";
+import { memoryManager } from "@/lib/agent/memory";
+import { dialogueSystem } from "@/lib/agent/dialogue";
+import { relationshipManager } from "@/db/relationship-repository";
 
 // Perception: What an agent observes
 export interface Perception {
@@ -98,6 +101,13 @@ export class Agent {
   }): Promise<DailyPlan> {
     const llm = getLLMClient();
 
+    // Retrieve relevant memories for planning context
+    const relevantMemories = await memoryManager.retrieveRelevant(
+      this.id,
+      "今天的计划和目标",
+      5
+    );
+
     // Build era-aware system prompt
     let systemPrompt = "";
 
@@ -119,6 +129,11 @@ ${this.eraPack.forbiddenConcepts.join("、")}
 背景：${this.identity.backstory ?? ""}
 
 [当前状态] energy: ${this.state.energy}, mood: ${this.state.mood}, stress: ${this.state.stress}
+
+[相关记忆]
+${relevantMemories.length > 0
+  ? relevantMemories.map(m => `- ${m.content}`).join("\n")
+  : "暂无相关记忆"}
 
 请为今天制定一个日程计划。从早上6点到晚上10点，安排5-10个活动步骤。
 每个步骤包括：时间、行动类型、目标（可选）、描述、原因。
@@ -264,9 +279,13 @@ ${this.eraPack.forbiddenConcepts.join("、")}
     };
   }
 
-  // Planning phase: Decide what to do
+  // Planning phase: Decide what to do with memory retrieval
   async planAction(perception: Perception): Promise<Action> {
     const llm = getLLMClient();
+
+    // Retrieve relevant memories based on current context
+    const contextQuery = `What should I do at ${perception.currentTime} near ${perception.nearbyBuildings.map(b => b.name).join(", ") || "nowhere"}?`;
+    const relevantMemories = await memoryManager.retrieveRelevant(this.id, contextQuery, 5);
 
     let systemPrompt = "";
 
@@ -288,6 +307,11 @@ ${this.eraPack.forbiddenConcepts.join("、")}
 背景：${this.identity.backstory ?? ""}
 
 [当前状态] energy: ${this.state.energy}, mood: ${this.state.mood}, stress: ${this.state.stress}
+
+[相关记忆]
+${relevantMemories.length > 0
+  ? relevantMemories.map(m => `- ${m.content}`).join("\n")
+  : "暂无相关记忆"}
 
 Respond with a valid JSON object with these fields:
 - action: "move" | "interact" | "talk" | "rest" | "work"
@@ -375,5 +399,49 @@ What do you want to do next?`;
 
   private calculateDistance(a: Position, b: Position): number {
     return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+  }
+
+  // Talk to another agent
+  async talkTo(
+    targetAgent: Agent,
+    world: {
+      buildings: Array<{ id: string; name: string; type: string; position: Position }>;
+      currentTime: string;
+      currentTick: number;
+    }
+  ): Promise<{ speakerText: string; listenerResponse: string } | null> {
+    const building = world.buildings.find((b) => {
+      const dist = this.calculateDistance(this.state.position, b.position);
+      return dist < 20;
+    });
+
+    const result = await dialogueSystem.generateDialogue({
+      speaker: this,
+      listener: targetAgent,
+      location: building?.name,
+      timeOfDay: world.currentTime,
+      currentTick: world.currentTick,
+      eraPack: this.eraPack,
+    });
+
+    return {
+      speakerText: result.speakerText,
+      listenerResponse: result.listenerResponse,
+    };
+  }
+
+  // Generate internal monologue
+  async think(situation: string, currentTick: number): Promise<string> {
+    return await dialogueSystem.generateMonologue(this, situation, currentTick);
+  }
+
+  // Get relationship with another agent
+  async getRelationshipWith(targetAgentId: string) {
+    return await relationshipManager.getRelationship(this.id, targetAgentId);
+  }
+
+  // Get all relationships
+  async getAllRelationships() {
+    return await relationshipManager.getAgentRelationships(this.id);
   }
 }

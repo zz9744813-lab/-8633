@@ -5,6 +5,7 @@ import {
   CreateMemoryInput,
   memoryRepo,
 } from "@/db/memory-repository";
+import { vectorMemoryStore, VectorMemory } from "@/db/vector-memory";
 import { getLLMClient } from "@/lib/llm/client";
 
 // In-memory cache for STM (Short-Term Memory)
@@ -104,6 +105,35 @@ export class MemoryManager {
   // Get memory count
   async getMemoryCount(agentId: string): Promise<number> {
     return await this.repo.getCount(agentId);
+  }
+
+  // Retrieve relevant memories using semantic search
+  async retrieveRelevant(
+    agentId: string,
+    query: string,
+    limit: number = 5,
+    useVectorSearch: boolean = true
+  ): Promise<VectorMemory[]> {
+    if (useVectorSearch && vectorMemoryStore.isAvailable()) {
+      return await vectorMemoryStore.hybridSearch(agentId, query, limit, 0.6);
+    } else {
+      // Fallback to text search
+      const memories = await this.repo.search(agentId, query, limit);
+      return memories.map((m) => ({
+        memoryId: m.id,
+        agentId: m.agentId,
+        content: m.content,
+        embedding: [],
+        importance: m.importance,
+        tick: m.tick,
+        similarity: 0.5,
+      }));
+    }
+  }
+
+  // Store embedding for a memory (call this after creating a memory)
+  async storeMemoryEmbedding(memory: Memory): Promise<void> {
+    await vectorMemoryStore.storeMemoryEmbedding(memory);
   }
 }
 

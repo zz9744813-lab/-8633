@@ -14,6 +14,17 @@ if (!fs.existsSync(DB_DIR)) {
 }
 
 const sqlite = new Database(DB_PATH);
+
+// Load sqlite-vec extension for vector search
+try {
+  // @ts-ignore - sqlite-vec is a native extension
+  sqlite.loadExtension("sqlite-vec");
+  console.log("[DB] sqlite-vec extension loaded");
+} catch (error) {
+  console.warn("[DB] Failed to load sqlite-vec extension:", error);
+  console.warn("[DB] Vector search will not be available");
+}
+
 export const db = drizzle(sqlite, { schema });
 
 // Run migrations on startup

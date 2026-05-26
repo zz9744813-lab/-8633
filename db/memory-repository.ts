@@ -1,6 +1,7 @@
 import { db } from "./index";
 import { memories, reflections, Memory } from "./schema";
 import { eq, and, desc, sql, notInArray } from "drizzle-orm";
+import { vectorMemoryStore } from "./vector-memory";
 
 export type MemoryType = "observation" | "event" | "dialogue" | "reflection" | "plan";
 
@@ -41,6 +42,14 @@ export class MemoryRepository {
     };
 
     await db.insert(memories).values(memory);
+
+    // Store vector embedding for semantic search
+    try {
+      await vectorMemoryStore.storeMemoryEmbedding(memory);
+    } catch (error) {
+      console.warn("[MemoryRepository] Failed to store embedding:", error);
+    }
+
     return memory;
   }
 

@@ -3,6 +3,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, generateObject, LanguageModel } from "ai";
 import { z } from "zod";
 import { getRateLimiter } from "./rate-limiter";
+import { usageTracker } from "./usage-tracker";
 
 export type LLMProvider = "anthropic" | "openai" | "ollama";
 
@@ -69,14 +70,19 @@ class LLMClientImpl implements LLMClient {
       rateLimiter.recordCall("generateText");
     }
 
-    const { text } = await generateText({
+    const result = await generateText({
       model: this.model,
       prompt,
       system,
       temperature: 0.7,
       maxTokens: 2000,
     });
-    return text;
+    // J4: Track usage
+    const usage = (result as any).usage;
+    if (usage) {
+      usageTracker.recordCall(this.config.provider, this.config.model, usage.promptTokens ?? 0, usage.completionTokens ?? 0, "generateText");
+    }
+    return result.text;
   }
 
   async generateObject<T extends z.ZodType>(
@@ -98,14 +104,19 @@ class LLMClientImpl implements LLMClient {
       rateLimiter.recordCall("generateObject");
     }
 
-    const { object } = await generateObject({
+    const result = await generateObject({
       model: this.model,
       prompt,
       schema,
       system,
       temperature: 0.7,
     });
-    return object;
+    // J4: Track usage
+    const usage = (result as any).usage;
+    if (usage) {
+      usageTracker.recordCall(this.config.provider, this.config.model, usage.promptTokens ?? 0, usage.completionTokens ?? 0, "generateObject");
+    }
+    return result.object;
   }
 
   // Generate JSON without schema validation (fallback for providers that don't support structured output)

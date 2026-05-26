@@ -10,6 +10,7 @@ import { EventLog } from "@/components/event-log";
 import { DialogueManager } from "@/components/dialogue-bubble";
 import { ChroniclePanel } from "@/components/chronicle-panel";
 import { RumorPanel } from "@/components/rumor-panel";
+import { CostDashboard } from "@/components/cost-dashboard";
 import { cn } from "@/lib/utils";
 import { Settings, Activity, Brain } from "lucide-react";
 
@@ -460,6 +461,9 @@ export default function Home() {
 
           {/* F3: Rumor Panel */}
           <RumorPanel worldId="default" />
+
+          {/* J4: Cost Dashboard */}
+          <CostDashboard />
 
           {/* Agent list */}
           <div>

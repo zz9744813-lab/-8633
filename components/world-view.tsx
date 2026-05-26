@@ -36,69 +36,79 @@ export function WorldView({
 
   useEffect(() => {
     if (!containerRef.current) return;
+    let cancelled = false;
+    let app: PIXI.Application | null = null;
 
-    // Initialize PixiJS Application
-    const app = new PIXI.Application({
-      width,
-      height,
-      backgroundColor: 0x2d5016,
-      antialias: false,
-      resolution: window.devicePixelRatio || 1,
-    });
-
-    containerRef.current.appendChild(app.view as HTMLCanvasElement);
-    appRef.current = app;
-
-    // Create ground texture
-    const ground = new PIXI.Graphics();
-    for (let x = 0; x < width; x += tileSize) {
-      for (let y = 0; y < height; y += tileSize) {
-        const variation = Math.random() * 0x101010;
-        const color = 0x2d5016 + variation;
-        ground.beginFill(color);
-        ground.drawRect(x, y, tileSize, tileSize);
-        ground.endFill();
-      }
-    }
-    app.stage.addChild(ground);
-
-    // Create buildings
-    const buildingsContainer = new PIXI.Container();
-    DEFAULT_BUILDINGS.forEach((building) => {
-      const g = new PIXI.Graphics();
-      g.beginFill(building.color);
-      g.drawRect(building.x, building.y, building.w, building.h);
-      g.endFill();
-
-      // Add border
-      g.lineStyle(2, 0x000000, 0.5);
-      g.drawRect(building.x, building.y, building.w, building.h);
-
-      // Add label
-      const text = new PIXI.Text(building.name, {
-        fontSize: 12,
-        fill: 0xffffff,
-        fontFamily: "sans-serif",
-        stroke: 0x000000,
-        strokeThickness: 3,
+    (async () => {
+      app = new PIXI.Application();
+      await app.init({
+        width,
+        height,
+        backgroundColor: 0x2d5016,
+        antialias: false,
+        resolution: window.devicePixelRatio || 1,
       });
-      text.anchor.set(0.5);
-      text.position.set(building.x + building.w / 2, building.y + building.h / 2);
-      g.addChild(text);
 
-      buildingsContainer.addChild(g);
-    });
-    app.stage.addChild(buildingsContainer);
+      if (cancelled) {
+        app.destroy(true);
+        return;
+      }
 
-    // Create agents container
-    const agentsContainer = new PIXI.Container();
-    agentsContainerRef.current = agentsContainer;
-    app.stage.addChild(agentsContainer);
+      containerRef.current!.appendChild(app.canvas);
+      appRef.current = app;
+
+      // Create ground texture
+      const ground = new PIXI.Graphics();
+      for (let x = 0; x < width; x += tileSize) {
+        for (let y = 0; y < height; y += tileSize) {
+          const variation = Math.random() * 0x101010;
+          const color = 0x2d5016 + variation;
+          ground.rect(x, y, tileSize, tileSize);
+          ground.fill(color);
+        }
+      }
+      app.stage.addChild(ground);
+
+      // Create buildings
+      const buildingsContainer = new PIXI.Container();
+      DEFAULT_BUILDINGS.forEach((building) => {
+        const g = new PIXI.Graphics();
+        g.rect(building.x, building.y, building.w, building.h);
+        g.fill(building.color);
+
+        // Add border
+        g.rect(building.x, building.y, building.w, building.h);
+        g.stroke({ width: 2, color: 0x000000, alpha: 0.5 });
+
+        // Add label
+        const text = new PIXI.Text({
+          text: building.name,
+          style: {
+            fontSize: 12,
+            fill: 0xffffff,
+            fontFamily: "sans-serif",
+            stroke: { color: 0x000000, width: 3 },
+          },
+        });
+        text.anchor.set(0.5);
+        text.position.set(building.x + building.w / 2, building.y + building.h / 2);
+        g.addChild(text);
+
+        buildingsContainer.addChild(g);
+      });
+      app.stage.addChild(buildingsContainer);
+
+      // Create agents container
+      const agentsContainer = new PIXI.Container();
+      agentsContainerRef.current = agentsContainer;
+      app.stage.addChild(agentsContainer);
+    })();
 
     return () => {
-      app.destroy(true);
-      if (containerRef.current && app.view) {
-        containerRef.current.removeChild(app.view as HTMLCanvasElement);
+      cancelled = true;
+      if (app) {
+        app.canvas.parentNode?.removeChild(app.canvas);
+        app.destroy(true);
       }
     };
   }, [width, height, tileSize]);
@@ -122,21 +132,22 @@ export function WorldView({
         const color = AGENT_COLORS[index % AGENT_COLORS.length];
 
         // Draw agent as a circle
-        g.beginFill(color);
-        g.drawCircle(0, 0, 8);
-        g.endFill();
+        g.circle(0, 0, 8);
+        g.fill(color);
 
         // Add border
-        g.lineStyle(2, 0x000000, 0.7);
-        g.drawCircle(0, 0, 8);
+        g.circle(0, 0, 8);
+        g.stroke({ width: 2, color: 0x000000, alpha: 0.7 });
 
         // Add name label
-        const text = new PIXI.Text(agent.name, {
-          fontSize: 10,
-          fill: 0xffffff,
-          fontFamily: "sans-serif",
-          stroke: 0x000000,
-          strokeThickness: 3,
+        const text = new PIXI.Text({
+          text: agent.name,
+          style: {
+            fontSize: 10,
+            fill: 0xffffff,
+            fontFamily: "sans-serif",
+            stroke: { color: 0x000000, width: 3 },
+          },
         });
         text.anchor.set(0.5, 1);
         text.position.set(0, -12);

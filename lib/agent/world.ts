@@ -7,7 +7,7 @@ export class World {
   name: string;
   width: number;
   height: number;
-  tick: number = 0;
+  tickCount: number = 0;
   paused: boolean = false;
   speed: number = 1;
 
@@ -57,12 +57,12 @@ export class World {
         position: b.position,
       })),
       currentTime: this.formatGameTime(),
-      tick: this.tick,
+      tick: this.tickCount,
     };
   }
 
-  // Main tick loop
-  async tick(): Promise<void> {
+  // Main simulation step
+  async step(): Promise<void> {
     if (this.paused) return;
 
     const worldState = this.getWorldState();
@@ -81,7 +81,7 @@ export class World {
       });
     }
 
-    this.tick++;
+    this.tickCount++;
 
     // Notify listeners
     for (const callback of this.onTickCallbacks) {
@@ -94,7 +94,7 @@ export class World {
 
     const intervalMs = 1000 / this.speed;
     this.tickInterval = setInterval(() => {
-      this.tick();
+      this.step();
     }, intervalMs);
   }
 
@@ -119,7 +119,7 @@ export class World {
 
   private formatGameTime(): string {
     const minutesPerTick = 10;
-    const totalMinutes = this.tick * minutesPerTick;
+    const totalMinutes = this.tickCount * minutesPerTick;
     const hour = Math.floor(totalMinutes / 60) % 24;
     const minute = totalMinutes % 60;
     return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
@@ -130,7 +130,7 @@ export class World {
     return {
       id: this.id,
       name: this.name,
-      tick: this.tick,
+      tick: this.tickCount,
       speed: this.speed,
       paused: this.paused,
       agents: Array.from(this.agents.entries()).map(([id, agent]) => ({

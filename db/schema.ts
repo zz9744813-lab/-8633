@@ -136,3 +136,15 @@ export const agentsRelations = relations(agents, ({ one, many }) => ({
   relationships: many(relationships),
   home: one(buildings, { fields: [agents.homeId], references: [buildings.id] }),
 }));
+
+// ============ Reflections ============
+export const reflections = sqliteTable("reflections", {
+  id: text("id").primaryKey(),
+  agentId: text("agent_id").references(() => agents.id).notNull(),
+  content: text("content").notNull(),
+  patternType: text("pattern_type"), // behavior_preference/social_dynamic/goal_progress
+  sourceMemoryIds: text("source_memory_ids", { mode: "json" }).$type<string[]>(),
+  createdTick: integer("created_tick").notNull(),
+  lastAccessedTick: integer("last_accessed_tick"),
+  importance: real("importance").default(0.8),
+});

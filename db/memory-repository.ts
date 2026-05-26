@@ -1,6 +1,6 @@
 import { db } from "./index";
-import { memories, Memory } from "./schema";
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { memories, reflections, Memory } from "./schema";
+import { eq, and, desc, sql, notInArray } from "drizzle-orm";
 
 export type MemoryType = "observation" | "event" | "dialogue" | "reflection" | "plan";
 
@@ -107,21 +107,17 @@ export class MemoryRepository {
       .limit(limit);
   }
 
-  // Get memories related to specific agents
+  // Get memories related to specific agents - JS filtering to avoid SQL injection
   async getRelatedToAgents(agentId: string, targetAgentIds: string[]): Promise<Memory[]> {
-    return await db
+    const all = await db
       .select()
       .from(memories)
-      .where(
-        and(
-          eq(memories.agentId, agentId),
-          sql`EXISTS (
-            SELECT 1 FROM json_each(${memories.relatedAgentIds})
-            WHERE json_each.value IN (${targetAgentIds.join(",")})
-          )`
-        )
-      )
+      .where(eq(memories.agentId, agentId))
       .orderBy(desc(memories.tick));
+
+    return all.filter((m) =>
+      (m.relatedAgentIds as string[] | null)?.some((id) => targetAgentIds.includes(id))
+    );
   }
 
   // Update last accessed tick
@@ -144,15 +140,16 @@ export class MemoryRepository {
 
     const keepIds = memoriesToKeep.map((m) => m.id);
 
-    // Delete others
+    if (keepIds.length === 0) {
+      // No memories to keep, delete all for this agent
+      const result = await db.delete(memories).where(eq(memories.agentId, agentId));
+      return result.changes || 0;
+    }
+
+    // Delete others using notInArray
     const result = await db
       .delete(memories)
-      .where(
-        and(
-          eq(memories.agentId, agentId),
-          keepIds.length > 0 ? sql`${memories.id} NOT IN (${keepIds.join(",")})` : undefined
-        )
-      );
+      .where(and(eq(memories.agentId, agentId), notInArray(memories.id, keepIds)));
 
     return result.changes || 0;
   }
@@ -171,21 +168,6 @@ export class MemoryRepository {
     await db.delete(memories).where(eq(memories.agentId, agentId));
   }
 }
-
-// Reflection records
-export const reflections = sqliteTable("reflections", {
-  id: text("id").primaryKey(),
-  agentId: text("agent_id").references(() => agents.id).notNull(),
-  content: text("content").notNull(),
-  patternType: text("pattern_type"), // behavior_preference/social_dynamic/goal_progress
-  sourceMemoryIds: text("source_memory_ids", { mode: "json" }).$type<string[]>(),
-  createdTick: integer("created_tick").notNull(),
-  lastAccessedTick: integer("last_accessed_tick"),
-  importance: real("importance").default(0.8),
-});
-
-import { sqliteTable } from "drizzle-orm/sqlite-core";
-import { agents } from "./schema";
 
 export class ReflectionRepository {
   async create(

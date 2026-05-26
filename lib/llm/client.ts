@@ -1,5 +1,5 @@
-import { anthropic } from "@ai-sdk/anthropic";
-import { openai } from "@ai-sdk/openai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, generateObject, LanguageModel } from "ai";
 import { z } from "zod";
 
@@ -30,19 +30,21 @@ class LLMClientImpl implements LLMClient {
 
   private createModel(config: LLMConfig): LanguageModel {
     switch (config.provider) {
-      case "anthropic":
-        return anthropic(config.model, {
-          apiKey: config.apiKey,
-        });
-      case "openai":
-        return openai(config.model, {
-          apiKey: config.apiKey,
-        });
-      case "ollama":
-        return openai(config.model, {
+      case "anthropic": {
+        const provider = createAnthropic({ apiKey: config.apiKey });
+        return provider(config.model);
+      }
+      case "openai": {
+        const provider = createOpenAI({ apiKey: config.apiKey });
+        return provider(config.model);
+      }
+      case "ollama": {
+        const provider = createOpenAI({
           apiKey: "ollama",
           baseURL: config.baseUrl || "http://localhost:11434/v1",
         });
+        return provider(config.model);
+      }
       default:
         throw new Error(`Unknown provider: ${config.provider}`);
     }

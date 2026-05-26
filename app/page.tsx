@@ -7,6 +7,8 @@ import { ConfigPanel } from "@/components/config-panel";
 import { MemoryViewer } from "@/components/memory-viewer";
 import { EventLog } from "@/components/event-log";
 import { DialogueManager } from "@/components/dialogue-bubble";
+import { ChroniclePanel } from "@/components/chronicle-panel";
+import { RumorPanel } from "@/components/rumor-panel";
 import { cn } from "@/lib/utils";
 import { Settings, Activity, Brain } from "lucide-react";
 
@@ -309,6 +311,18 @@ export default function Home() {
                 </div>
               )}
 
+              {/* F2.4: Long-term Goals Display */}
+              {selectedAgent.currentGoals && selectedAgent.currentGoals.length > 0 && (
+                <div className="mt-3 text-xs">
+                  <div className="font-bold mb-1">🎯 长期目标</div>
+                  <ul className="list-disc list-inside text-muted-foreground">
+                    {selectedAgent.currentGoals.map((g, i) => (
+                      <li key={i}>{g}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <button
                 onClick={() => setIsMemoryOpen(true)}
                 className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-md text-sm font-medium transition-colors"
@@ -323,7 +337,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* Recent events */}
+          {/* EventLog */}
           <EventLog
             events={[
               {
@@ -336,6 +350,12 @@ export default function Home() {
             ]}
             maxHeight={200}
           />
+
+          {/* F1: Chronicle Panel */}
+          <ChroniclePanel worldId="default" />
+
+          {/* F3: Rumor Panel */}
+          <RumorPanel worldId="default" />
 
           {/* Agent list */}
           <div>

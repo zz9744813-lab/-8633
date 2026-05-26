@@ -275,7 +275,8 @@ export class WorldRepository {
       const agent = world.addAgent(
         serializedAgent.id,
         serializedAgent.identity,
-        serializedAgent.state.position
+        serializedAgent.state.position,
+        false // Don't record birth when loading existing agents
       );
 
       // Restore agent state

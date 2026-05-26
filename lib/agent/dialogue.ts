@@ -3,8 +3,11 @@ import { memoryManager } from "@/lib/agent/memory";
 import { relationshipManager } from "@/db/relationship-repository";
 import { Agent, AgentIdentity } from "@/lib/agent/agent";
 import { EraPack } from "@/lib/era-pack/loader";
+import { rumorEngine } from "./rumor-engine";
+import { World } from "./world";
 
 export interface DialogueContext {
+  world: World;
   speaker: Agent;
   listener: Agent;
   topic?: string;
@@ -128,6 +131,24 @@ Respond with JSON:
           Math.abs(avgImpact) / 10,
           context.currentTick
         );
+      }
+
+      // F3: Try to spread rumors during conversation
+      try {
+        const spreadResult = await rumorEngine.trySpreadRumor(
+          context.world,
+          context.speaker,
+          context.listener,
+          context.topic
+        );
+        if (spreadResult?.distorted) {
+          console.log(`[Rumor] ${context.speaker.identity.name} told ${context.listener.identity.name} a distorted rumor about ${spreadResult.content.substring(0, 50)}...`);
+        } else if (spreadResult) {
+          console.log(`[Rumor] ${context.speaker.identity.name} told ${context.listener.identity.name} a rumor`);
+        }
+      } catch (e) {
+        // Rumor spread is optional, don't fail dialogue
+        console.error("[Dialogue] Rumor spread failed:", e);
       }
 
       return {

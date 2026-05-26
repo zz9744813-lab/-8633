@@ -1,5 +1,8 @@
 import { Agent } from "./agent";
 import { memoryManager, reflectionEngine } from "./memory";
+import { chronicleEngine } from "./chronicle-engine";
+import { rumorEngine } from "./rumor-engine";
+import { dramaEngine } from "./drama-engine";
 import { AgentIdentity, Building, Position } from "@/lib/types";
 import { EraPack } from "@/lib/era-pack/loader";
 import { worldEventSystem } from "@/db/world-event-repository";
@@ -37,13 +40,26 @@ export class World {
     this.eraPack = eraPack;
   }
 
-  addAgent(id: string, identity: AgentIdentity, position?: Position): Agent {
+  addAgent(
+    id: string,
+    identity: AgentIdentity,
+    position?: Position,
+    recordBirth: boolean = true
+  ): Agent {
     const pos = position || {
       x: Math.random() * (this.width - 20) + 10,
       y: Math.random() * (this.height - 20) + 10,
     };
     const agent = new Agent(id, identity, pos, this.eraPack);
     this.agents.set(id, agent);
+
+    // F1: Record birth in chronicle
+    if (recordBirth) {
+      chronicleEngine.recordBirth(this, agent).catch((e) => {
+        console.error("[World] Failed to record birth:", e);
+      });
+    }
+
     return agent;
   }
 
@@ -209,8 +225,39 @@ export class World {
       for (const agent of this.agents.values()) {
         if (this.tickCount - (agent.lastReflectionTick ?? 0) >= 100) {
           try {
-            await reflectionEngine.reflect(agent.id, agent.state, this.tickCount);
-            agent.lastReflectionTick = this.tickCount;
+            const result = await reflectionEngine.reflect(agent.id, agent.state, this.tickCount);
+            if (result) {
+              agent.lastReflectionTick = this.tickCount;
+
+              // F2.3: Apply goal updates from reflection
+              if (result.goalUpdates) {
+                const currentGoals = agent.state.currentGoals || [];
+
+                // Remove goals
+                if (result.goalUpdates.remove && result.goalUpdates.remove.length > 0) {
+                  for (const goalToRemove of result.goalUpdates.remove) {
+                    const idx = currentGoals.indexOf(goalToRemove);
+                    if (idx !== -1) {
+                      currentGoals.splice(idx, 1);
+                      console.log(`[Reflection] ${agent.identity.name} abandoned goal: ${goalToRemove}`);
+                    }
+                  }
+                }
+
+                // Add new goals
+                if (result.goalUpdates.add && result.goalUpdates.add.length > 0) {
+                  for (const newGoal of result.goalUpdates.add) {
+                    if (!currentGoals.includes(newGoal)) {
+                      currentGoals.push(newGoal);
+                      console.log(`[Reflection] ${agent.identity.name} set new goal: ${newGoal}`);
+                    }
+                  }
+                }
+
+                // Update agent state
+                agent.state.currentGoals = currentGoals;
+              }
+            }
           } catch (e) {
             console.error("[World] Reflection failed:", e);
           }
@@ -238,6 +285,46 @@ export class World {
             tick: this.tickCount,
           });
         }
+
+        // F1: Record important world events in chronicle
+        if (event.type === "disaster" || event.type === "festival") {
+          await chronicleEngine.recordDisaster(
+            this,
+            event.type === "disaster" ? "天灾降临" : "节日庆典",
+            event.description,
+            event.witnessIds
+          );
+        }
+      }
+    }
+
+    // === F3: Rumor generation (每天一次，随机生成谣言) ===
+    if (hour === 20 && minute === 0) {
+      for (const agent of this.agents.values()) {
+        // 20% 概率产生谣言
+        if (Math.random() < 0.2) {
+          try {
+            const result = await rumorEngine.generateRumorFromMemory(this, agent);
+            if (result) {
+              console.log(`[Rumor] ${agent.identity.name} created a ${result.type} rumor about ${result.subject}`);
+            }
+          } catch (e) {
+            console.error("[World] Rumor generation failed:", e);
+          }
+        }
+      }
+    }
+
+    // === F4: Drama detection (每天检查一次，20:00 触发) ===
+    if (hour === 20 && minute === 30) {
+      try {
+        const drama = await dramaEngine.checkForDrama(this);
+        if (drama) {
+          await dramaEngine.executeDrama(this, drama);
+          console.log(`[Drama] Triggered: ${drama.type} - ${drama.description}`);
+        }
+      } catch (e) {
+        console.error("[World] Drama check failed:", e);
       }
     }
 

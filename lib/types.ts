@@ -38,6 +38,7 @@ export type AgentState = {
   status: AgentStatus;
   targetPosition?: Position | null;
   insideBuildingId?: string | null;
+  currentGoals?: string[]; // F2: Long-term goals
 };
 
 // ============ Time Types ============

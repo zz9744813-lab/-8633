@@ -66,12 +66,15 @@ export class Agent {
     this.identity = identity;
     this.eraPack = eraPack;
     this.state = {
+      id,
+      name: identity.name,
       position: initialPosition,
       status: "idle",
       currentActivity: "idle",
       energy: 70,
       mood: 50,
       stress: 30,
+      currentGoals: identity.initialGoals ?? [],
     };
   }
 
@@ -130,6 +133,13 @@ ${this.eraPack.forbiddenConcepts.join("、")}
 背景：${this.identity.backstory ?? ""}
 
 [当前状态] energy: ${this.state.energy}, mood: ${this.state.mood}, stress: ${this.state.stress}
+
+[长期目标]
+${this.state.currentGoals.length > 0
+  ? this.state.currentGoals.map((g, i) => `${i + 1}. ${g}`).join("\n")
+  : "暂无明确长期目标"}
+
+今天的计划应该考虑这些目标——不一定每天都推进，但不要完全无视。
 
 [相关记忆]
 ${relevantMemories.length > 0
@@ -449,6 +459,7 @@ What do you want to do next?`;
     });
 
     const result = await dialogueSystem.generateDialogue({
+      world,
       speaker: this,
       listener: targetAgent,
       location: building?.name,

@@ -7,6 +7,7 @@ import {
 } from "@/db/memory-repository";
 import { vectorMemoryStore, VectorMemory } from "@/db/vector-memory";
 import { getLLMClient } from "@/lib/llm/client";
+import { z } from "zod";
 
 // In-memory cache for STM (Short-Term Memory)
 const stmCache: Map<string, Memory[]> = new Map();
@@ -137,6 +138,15 @@ export class MemoryManager {
   }
 }
 
+// Reflection result with optional goal updates
+export interface ReflectionResult {
+  insight: string;
+  goalUpdates?: {
+    add?: string[];
+    remove?: string[];
+  };
+}
+
 // Reflection engine
 export class ReflectionEngine {
   private memoryManager: MemoryManager;
@@ -146,7 +156,11 @@ export class ReflectionEngine {
   }
 
   // Generate reflection based on recent experiences
-  async reflect(agentId: string, agentState: AgentState, currentTick: number): Promise<string | null> {
+  async reflect(
+    agentId: string,
+    agentState: AgentState,
+    currentTick: number
+  ): Promise<ReflectionResult | null> {
     const recentMemories = await this.memoryManager.getSTM(agentId, currentTick, 30);
 
     if (recentMemories.length < 10) {
@@ -162,20 +176,43 @@ export class ReflectionEngine {
         .map((m) => `- ${m.type}: ${m.content}`)
         .join("\n");
 
+      const currentGoals = agentState.currentGoals || [];
+
       const systemPrompt = `You are analyzing a person's recent experiences to identify patterns or insights.
 Generate a brief reflection (1-2 sentences) about what this person might be noticing or learning.
-Be specific and grounded in the experiences. Return only the reflection text.`;
+Be specific and grounded in the experiences.
 
-      const prompt = `Recent experiences:\n${memorySummary}\n\nWhat pattern or insight might this person have?`;
+Also evaluate their current long-term goals and decide if any should be:
+- Added (new ambitions that emerged from recent experiences)
+- Removed (goals that were completed, abandoned, or no longer relevant)
 
-      const reflection = await llm.generateText(prompt, systemPrompt);
-      const trimmedReflection = reflection.trim();
+Return JSON with the reflection and any goal updates.`;
+
+      const prompt = `Recent experiences:
+${memorySummary}
+
+Current long-term goals:
+${currentGoals.length > 0 ? currentGoals.map((g, i) => `${i + 1}. ${g}`).join("\n") : "暂无明确长期目标"}
+
+What pattern or insight might this person have? Should their goals be updated?`;
+
+      const ReflectionSchema = z.object({
+        insight: z.string().describe("1-2 sentences reflection on recent experiences"),
+        goalUpdates: z.object({
+          add: z.array(z.string()).optional().describe("New goals to add based on recent experiences"),
+          remove: z.array(z.string()).optional().describe("Goals to remove (completed or abandoned)"),
+        }).optional(),
+      });
+
+      const result = await llm.generateObject(prompt, ReflectionSchema, systemPrompt);
+
+      const trimmedInsight = result.insight.trim();
 
       // Store as reflection in DB
       const sourceIds = recentMemories.map((m) => m.id);
       await reflectionRepo.create(
         agentId,
-        trimmedReflection,
+        trimmedInsight,
         sourceIds,
         currentTick,
         "behavior_preference"
@@ -185,12 +222,15 @@ Be specific and grounded in the experiences. Return only the reflection text.`;
       await this.memoryManager.addMemory({
         agentId,
         type: "reflection",
-        content: trimmedReflection,
+        content: trimmedInsight,
         importance: 0.8,
         tick: currentTick,
       });
 
-      return trimmedReflection;
+      return {
+        insight: trimmedInsight,
+        goalUpdates: result.goalUpdates,
+      };
     } catch (error) {
       console.error("Reflection generation failed:", error);
       return null;

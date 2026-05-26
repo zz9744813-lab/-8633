@@ -73,6 +73,7 @@ export const agents = sqliteTable("agents", {
 
   // Current state (denormalized)
   currentActivity: text("current_activity").default("idle"),
+  currentGoals: text("current_goals", { mode: "json" }).$type<string[]>(),
   energy: real("energy").default(70),
   mood: real("mood").default(50),
   stress: real("stress").default(30),
@@ -148,7 +149,49 @@ export const llmCalls = sqliteTable("llm_calls", {
   tick: integer("tick"),
 });
 
-// ============ Relations ============
+// ============ Chronicles ============
+export const chronicles = sqliteTable("chronicles", {
+  id: text("id").primaryKey(),
+  worldId: text("world_id").references(() => worlds.id).notNull(),
+  tick: integer("tick").notNull(),
+  year: integer("year").notNull(),
+  season: text("season").notNull(), // spring/summer/autumn/winter
+  day: integer("day").notNull(),
+  type: text("type").notNull(), // birth/death/building/war/marriage/disaster/milestone
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  agentIds: text("agent_ids", { mode: "json" }).$type<string[]>(),
+  buildingIds: text("building_ids", { mode: "json" }).$type<string[]>(),
+  importance: real("importance").default(0.5), // 0-1, affects display prominence
+  metadata: text("metadata", { mode: "json" }), // extra context
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+// ============ Rumors ============
+export const rumors = sqliteTable("rumors", {
+  id: text("id").primaryKey(),
+  worldId: text("world_id").references(() => worlds.id).notNull(),
+  originatorId: text("originator_id").references(() => agents.id),
+  tick: integer("tick").notNull(),
+  type: text("type").notNull(), // scandal/secret/event/relationship/achievement/danger
+  subject: text("subject").notNull(), // who/what is the rumor about
+  content: text("content").notNull(), // the rumor text
+  truthLevel: real("truth_level").default(0.5), // 0-1
+  spreadCount: integer("spread_count").default(0),
+  knownByIds: text("known_by_ids", { mode: "json" }).$type<string[]>().default([]),
+  sourceMemoryId: text("source_memory_id"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+export const rumorsRelations = relations(rumors, ({ one }) => ({
+  world: one(worlds, { fields: [rumors.worldId], references: [worlds.id] }),
+  originator: one(agents, { fields: [rumors.originatorId], references: [agents.id] }),
+}));
+
+export const chroniclesRelations = relations(chronicles, ({ one }) => ({
+  world: one(worlds, { fields: [chronicles.worldId], references: [worlds.id] }),
+}));
+
 export const worldsRelations = relations(worlds, ({ many }) => ({
   agents: many(agents),
   buildings: many(buildings),

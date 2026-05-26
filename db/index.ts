@@ -36,3 +36,72 @@ export function runMigrations() {
     migrate(db, { migrationsFolder });
   }
 }
+
+// Ensure chronicles table exists (F1: Chronicle 编年史)
+export function ensureChroniclesTable() {
+  try {
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS chronicles (
+        id TEXT PRIMARY KEY,
+        world_id TEXT NOT NULL,
+        tick INTEGER NOT NULL,
+        year INTEGER NOT NULL,
+        season TEXT NOT NULL,
+        day INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        agent_ids TEXT,
+        building_ids TEXT,
+        importance REAL DEFAULT 0.5,
+        metadata TEXT,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      )
+    `);
+
+    // Create index for common queries
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_chronicles_world ON chronicles(world_id)`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_chronicles_tick ON chronicles(tick)`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_chronicles_year ON chronicles(year)`);
+
+    console.log("[DB] Chronicles table ready");
+  } catch (error) {
+    console.error("[DB] Failed to create chronicles table:", error);
+  }
+}
+
+// Run on module load
+ensureChroniclesTable();
+
+// Ensure rumors table exists (F3: Rumor propagation)
+function ensureRumorsTable() {
+  try {
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS rumors (
+        id TEXT PRIMARY KEY,
+        world_id TEXT NOT NULL,
+        originator_id TEXT,
+        tick INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        content TEXT NOT NULL,
+        truth_level REAL DEFAULT 0.5,
+        spread_count INTEGER DEFAULT 0,
+        known_by_ids TEXT DEFAULT '[]',
+        source_memory_id TEXT,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      )
+    `);
+
+    // Create index for common queries
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_rumors_world ON rumors(world_id)`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_rumors_tick ON rumors(tick)`);
+    sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_rumors_spread ON rumors(spread_count)`);
+
+    console.log("[DB] Rumors table ready");
+  } catch (error) {
+    console.error("[DB] Failed to create rumors table:", error);
+  }
+}
+
+ensureRumorsTable();

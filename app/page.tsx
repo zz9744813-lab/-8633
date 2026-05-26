@@ -28,6 +28,8 @@ interface AgentState {
   currentGoals?: string[];
   isMoving?: boolean;
   dir?: string;
+  money?: number;
+  inventory?: Record<string, number>;
   dailyPlan?: { morningThought: string; steps: { time: string; description: string }[]; currentStepIdx: number };
 }
 
@@ -120,6 +122,8 @@ export default function Home() {
               currentGoals: a.state.currentGoals,
               isMoving: a.state.isMoving,
               dir: a.state.position.dir,
+              money: a.state.money,
+              inventory: a.state.inventory,
               dailyPlan: a.dailyPlan,
             })),
             events: [],
@@ -341,6 +345,28 @@ export default function Home() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* G4: Wallet display */}
+              <div className="mt-3 text-xs flex items-center gap-2">
+                <span className="font-bold">钱包</span>
+                <span className="text-yellow-600 font-mono">{selectedAgent.money?.toFixed(1) ?? "0.0"} 币</span>
+              </div>
+
+              {/* G4: Inventory display */}
+              {selectedAgent.inventory && Object.keys(selectedAgent.inventory).length > 0 && (
+                <div className="mt-2 text-xs">
+                  <span className="font-bold">背包</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {Object.entries(selectedAgent.inventory).map(([itemId, qty]) => (
+                      qty > 0 ? (
+                        <span key={itemId} className="px-1.5 py-0.5 bg-muted rounded text-muted-foreground">
+                          {itemId}×{qty}
+                        </span>
+                      ) : null
+                    ))}
+                  </div>
                 </div>
               )}
 

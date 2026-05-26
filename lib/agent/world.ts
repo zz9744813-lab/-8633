@@ -5,6 +5,7 @@ import { rumorEngine } from "./rumor-engine";
 import { dramaEngine } from "./drama-engine";
 import { AgentIdentity, Building, Position } from "@/lib/types";
 import { EraPack } from "@/lib/era-pack/loader";
+import { initBuildingEconomy, calculatePrice, ITEMS } from "@/lib/economy/engine";
 import { worldEventSystem } from "@/db/world-event-repository";
 import { worldRepository } from "@/db/world-repository";
 import { relationshipManager } from "@/db/relationship-repository";
@@ -276,6 +277,52 @@ export class World {
       }
     }
 
+    // === G4: Economy restock & auto-buy at midnight ===
+    if (hour === 0 && minute === 0) {
+      for (const building of this.buildings) {
+        if (!building.economy) {
+          building.economy = initBuildingEconomy(building.type, this.tickCount);
+        } else {
+          const econ = building.economy;
+          // Restock each item to max (double base stock)
+          for (const itemId of Object.keys(econ.prices)) {
+            const maxStock = ITEMS[itemId] ? 50 : 10;
+            const currentStock = econ.inventory[itemId] ?? 0;
+            if (currentStock < maxStock) {
+              econ.inventory[itemId] = Math.min(maxStock, currentStock + Math.ceil(maxStock * 0.3));
+            }
+          }
+          econ.lastRestockTick = this.tickCount;
+        }
+      }
+
+      // Auto-buy food when low (<3 items)
+      for (const agent of this.agents.values()) {
+        if (agent.state.status !== "alive" || agent.identity.age < 12) continue;
+        const inv = agent.state.inventory ?? {};
+        const totalFood = Object.entries(inv).filter(([id]) => ITEMS[id]?.category === "food").reduce((s, [, q]) => s + q, 0);
+        if (totalFood < 3) {
+          // Find nearest shop selling food
+          for (const building of this.buildings) {
+            if (!building.economy) continue;
+            for (const [itemId, stock] of Object.entries(building.economy.inventory)) {
+              if (stock <= 0) continue;
+              const item = ITEMS[itemId];
+              if (!item || item.category !== "food") continue;
+              const price = calculatePrice(item.basePrice, stock, 50);
+              if ((agent.state.money ?? 0) >= price) {
+                agent.state.money = (agent.state.money ?? 0) - price;
+                agent.state.inventory = { ...agent.state.inventory, [itemId]: (agent.state.inventory?.[itemId] ?? 0) + 1 };
+                building.economy.inventory[itemId] = (building.economy.inventory[itemId] ?? 0) - 1;
+                break;
+              }
+            }
+            if (Object.values(agent.state.inventory ?? {}).reduce((s, q) => s + q, 0) > (agent.state.inventory?.bread ?? 0)) break;
+          }
+        }
+      }
+    }
+
     // === G1.4: Process illness events from world events ===
     // (illness is applied to witness agents when the event is processed below)
 
@@ -331,6 +378,44 @@ export class World {
         height: this.height,
         buildings: this.buildings,
       });
+
+      // G4: Handle BUY action - find nearest shop and purchase
+      if (completed && action.type === "BUY" && agent.state.insideBuildingId) {
+        const building = this.buildings.find(b => b.id === agent.state.insideBuildingId);
+        if (building?.economy) {
+          for (const [itemId, stock] of Object.entries(building.economy.inventory)) {
+            if (stock <= 0) continue;
+            const item = ITEMS[itemId];
+            if (!item) continue;
+            const price = calculatePrice(item.basePrice, stock, 50);
+            if ((agent.state.money ?? 0) >= price) {
+              agent.state.money = (agent.state.money ?? 0) - price;
+              agent.state.inventory = { ...agent.state.inventory, [itemId]: (agent.state.inventory?.[itemId] ?? 0) + 1 };
+              building.economy.inventory[itemId] = stock - 1;
+              agent.state.currentActivity = "buying";
+              break;
+            }
+          }
+        }
+      }
+      // G4: Handle SELL action
+      if (completed && action.type === "SELL" && agent.state.insideBuildingId) {
+        const building = this.buildings.find(b => b.id === agent.state.insideBuildingId);
+        if (building?.economy) {
+          for (const [itemId, qty] of Object.entries(agent.state.inventory ?? {})) {
+            if (qty <= 0) continue;
+            const item = ITEMS[itemId];
+            if (!item) continue;
+            const price = calculatePrice(item.basePrice, building.economy.inventory[itemId] ?? 0, 50);
+            const sellPrice = price * 0.6; // Sell at 60% of current price
+            agent.state.money = (agent.state.money ?? 0) + sellPrice;
+            agent.state.inventory = { ...agent.state.inventory, [itemId]: qty - 1 };
+            building.economy.inventory[itemId] = (building.economy.inventory[itemId] ?? 0) + 1;
+            agent.state.currentActivity = "selling";
+            break;
+          }
+        }
+      }
 
       // If action completed and it's a talking action, try dialogue
       if (completed && action.type === "SAY" && action.targetId) {

@@ -56,6 +56,8 @@ export type AgentState = {
   deathTick?: number;
   isMoving?: boolean;
   walkFrame?: number;
+  money?: number;
+  inventory?: Record<string, number>; // itemId → quantity
 };
 
 // ============ Time Types ============
@@ -112,6 +114,14 @@ export type Building = {
   height: number;
   ownerId?: string;
   description?: string;
+  economy?: BuildingEconomy;
+};
+
+export type BuildingEconomy = {
+  inventory: Record<string, number>; // itemId → stock
+  prices: Record<string, number>; // itemId → base price
+  wage: number; // daily wage for workers
+  lastRestockTick: number;
 };
 
 // ============ Era Pack Types ============
@@ -166,7 +176,9 @@ export type ActionType =
   | "INTERACT"
   | "USE"
   | "WAIT"
-  | "SAY";
+  | "SAY"
+  | "BUY"
+  | "SELL";
 
 export type Action = {
   type: ActionType;

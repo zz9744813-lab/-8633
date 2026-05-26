@@ -86,6 +86,8 @@ export class Agent {
       health: 1.0,
       skills: initialSkills,
       currentGoals: identity.initialGoals ?? [],
+      money: 20,
+      inventory: {},
     };
   }
 
@@ -391,7 +393,7 @@ What do you want to do next?`;
     world: {
       width: number;
       height: number;
-      buildings: Array<{ id: string; name: string; type: string; position: Position; width: number; height: number }>;
+      buildings: Array<{ id: string; name: string; type: string; position: Position; width: number; height: number; economy?: { wage?: number; inventory?: Record<string, number>; prices?: Record<string, number> } }>;
     },
     dt: number = 1
   ): boolean {
@@ -443,6 +445,10 @@ What do you want to do next?`;
       case "WORK": {
         this.state.currentActivity = "working";
         this.state.energy = Math.max(0, this.state.energy - 2);
+        // G4: Earn money from work
+        const workplace = world.buildings.find(b => b.id === this.state.insideBuildingId);
+        const wage = workplace?.economy?.wage ?? 2;
+        this.state.money = (this.state.money ?? 0) + wage * 0.1;
         // G3: Grow primary skill
         if (this.eraPack && this.state.skills) {
           const occ = this.eraPack.occupations.find(o => o.name === this.identity.occupation || o.id === this.identity.occupation);
@@ -480,6 +486,14 @@ What do you want to do next?`;
       }
       case "SAY": {
         this.state.currentActivity = "talking";
+        return true;
+      }
+      case "BUY": {
+        this.state.currentActivity = "buying";
+        return true;
+      }
+      case "SELL": {
+        this.state.currentActivity = "selling";
         return true;
       }
       default: {

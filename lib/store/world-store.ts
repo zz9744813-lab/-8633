@@ -3,8 +3,8 @@ import { Building } from "@/lib/types";
 
 interface AgentData {
   id: string;
-  identity: { name: string; age: number; occupation: string };
-  state: { position: { x: number; y: number }; currentActivity: string; energy: number; mood: number };
+  identity: { name: string; age: number; occupation: string; familyName?: string };
+  state: { position: { x: number; y: number }; currentActivity: string; energy: number; mood: number; money?: number; inventory?: Record<string, number> };
   dailyPlan?: { morningThought: string; steps: { time: string; description: string }[] } | null;
 }
 

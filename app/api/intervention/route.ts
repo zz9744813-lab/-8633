@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWorld } from "@/lib/agent";
 import { loadEraPack, generateAgentIdentity } from "@/lib/era-pack/loader";
+import { memoryManager } from "@/lib/agent/memory";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,8 @@ export const dynamic = "force-dynamic";
 // /weather - Change weather
 // /time - Change time of day
 // /emotion - Set agent's emotional state
+// /place - Place a building
+// /remove - Remove a building or agent
 
 export async function POST(request: NextRequest) {
   try {
@@ -89,7 +92,17 @@ export async function POST(request: NextRequest) {
         if (!agent) {
           return NextResponse.json({ error: "Agent not found" }, { status: 404 });
         }
-        // In a full implementation, this would trigger a dialogue
+        // Record as dialogue memory
+        try {
+          await memoryManager.addMemory({
+            agentId: agent.id,
+            type: "dialogue",
+            content: `你说道: "${message}"`,
+            importance: 0.6,
+            tick: world.tickCount,
+          });
+        } catch { /* memory is optional */ }
+
         result = {
           success: true,
           agentId,
@@ -104,7 +117,6 @@ export async function POST(request: NextRequest) {
 
       case "event": {
         const { description, severity = "normal" } = params;
-        // Broadcast event to all agents
         result = {
           success: true,
           event: {
@@ -155,6 +167,45 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case "place": {
+        const { type, name, x, y, width = 60, height = 60 } = params;
+        const buildingId = `bld-${Date.now()}`;
+        world.addBuilding({
+          id: buildingId,
+          type,
+          name: name || `${type}`,
+          position: { x: Math.max(0, Math.min(world.width, x)), y: Math.max(0, Math.min(world.height, y)) },
+          width,
+          height,
+          description: `玩家放置的${name || type}`,
+        });
+        result = { success: true, buildingId, position: { x, y } };
+        break;
+      }
+
+      case "remove": {
+        const { targetType, targetId } = params;
+        if (targetType === "building") {
+          const idx = world.buildings.findIndex(b => b.id === targetId);
+          if (idx === -1) {
+            return NextResponse.json({ error: "Building not found" }, { status: 404 });
+          }
+          world.buildings.splice(idx, 1);
+          result = { success: true, removedType: "building", id: targetId };
+        } else if (targetType === "agent") {
+          const agent = world.agents.get(targetId);
+          if (!agent) {
+            return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+          }
+          agent.state.status = "dead";
+          agent.state.deathTick = world.tickCount;
+          result = { success: true, removedType: "agent", id: targetId };
+        } else {
+          return NextResponse.json({ error: "Invalid targetType: building or agent" }, { status: 400 });
+        }
+        break;
+      }
+
       default:
         return NextResponse.json(
           { error: `Unknown command: ${command}` },
@@ -194,10 +245,30 @@ export async function GET() {
     },
     {
       name: "say",
-      description: "Make an agent speak",
+      description: "Make an agent speak (recorded as memory)",
       params: {
         agentId: "string (required)",
         message: "string (required)",
+      },
+    },
+    {
+      name: "place",
+      description: "Place a new building",
+      params: {
+        type: "string (required, e.g. market, tavern)",
+        name: "string (optional)",
+        x: "number (required)",
+        y: "number (required)",
+        width: "number (optional, default 60)",
+        height: "number (optional, default 60)",
+      },
+    },
+    {
+      name: "remove",
+      description: "Remove a building or kill an agent",
+      params: {
+        targetType: '"building" | "agent" (required)',
+        targetId: "string (required)",
       },
     },
     {

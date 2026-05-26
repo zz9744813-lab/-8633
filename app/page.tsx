@@ -79,6 +79,7 @@ export default function Home() {
   const [isConnected, setIsConnected] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<AgentState | null>(null);
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
+  const [sayMessage, setSayMessage] = useState("");
   const [agentVocab, setAgentVocab] = useState<Array<{ word: string; meaning: string; usageCount: number; fidelity: number }>>([]);
 
   // SSE connection ref
@@ -483,6 +484,60 @@ export default function Home() {
               ))}
             </div>
           </div>
+
+          {/* J3: Player intervention panel */}
+          {selectedAgent && (
+            <div className="border-t pt-3 mt-3">
+              <h4 className="font-bold text-xs mb-2">干预 {selectedAgent.name}</h4>
+              <div className="flex gap-1">
+                <input
+                  placeholder="让TA说..."
+                  className="flex-1 px-2 py-1 text-xs bg-background border rounded"
+                  value={sayMessage}
+                  onChange={(e) => setSayMessage(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === "Enter" && sayMessage.trim()) {
+                      await fetch("/api/intervention", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ command: "say", params: { agentId: selectedAgent.id, message: sayMessage } }),
+                      });
+                      setSayMessage("");
+                    }
+                  }}
+                />
+                <button className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded" onClick={async () => {
+                  if (!sayMessage.trim()) return;
+                  await fetch("/api/intervention", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ command: "say", params: { agentId: selectedAgent.id, message: sayMessage } }),
+                  });
+                  setSayMessage("");
+                }}>说</button>
+              </div>
+              <div className="flex gap-1 mt-1">
+                <button className="px-2 py-1 text-xs bg-destructive text-destructive-foreground rounded" onClick={async () => {
+                  if (!confirm(`移除 ${selectedAgent.name}?`)) return;
+                  await fetch("/api/intervention", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ command: "remove", params: { targetType: "agent", targetId: selectedAgent.id } }),
+                  });
+                }}>移除</button>
+                <button className="px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded" onClick={async () => {
+                  await fetch("/api/intervention", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ command: "emotion", params: { agentId: selectedAgent.id, mood: 80, stress: 10 } }),
+                  });
+                }}>安抚</button>
+                <button className="px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded" onClick={async () => {
+                  await fetch("/api/intervention", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ command: "emotion", params: { agentId: selectedAgent.id, mood: 10, stress: 80 } }),
+                  });
+                }}>激怒</button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 

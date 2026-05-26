@@ -1,0 +1,118 @@
+id: song_dynasty
+name: 宋朝江南水乡
+yearStart: 1080
+calendar: lunar
+
+description: |
+  北宋中期的江南水乡。
+  经济繁荣，文化昌盛。
+  科举制度完善，文人地位崇高。
+  茶道、诗词、书画盛行。
+
+worldPrompt: |
+  你生活在北宋时期的江南水乡。
+  这是宋神宗元丰年间，王安石变法虽遇阻力但影响深远。
+  镇上河流纵横，石桥相连。
+  文人墨客常聚于茶楼，吟诗作画。
+  市井繁华，商铺林立。
+  科技水平：活字印刷、指南针、火药。
+  社会规范：重视科举，尊重文人，男耕女织。
+
+occupations:
+  - id: farmer
+    name: 农夫
+    workplace: field
+    description: 耕种水稻、桑麻
+  - id: scholar
+    name: 书生
+    workplace: academy
+    description: 读书备考，准备科举
+  - id: merchant
+    name: 商人
+    workplace: shop
+    description: 经营店铺，买卖货物
+  - id: innkeeper
+    name: 茶肆老板
+    workplace: teahouse
+    description: 经营茶肆，招待南来北往的客人
+  - id: craftsman
+    name: 工匠
+    workplace: workshop
+    description: 制作瓷器、丝绸、竹器等
+  - id: physician
+    name: 郎中
+    workplace: clinic
+    description: 行医问诊，采药制药
+  - id: monk
+    name: 僧人
+    workplace: temple
+    description: 在寺庙修行，诵经礼佛
+  - id: fisherman
+    name: 渔夫
+    workplace: river
+    description: 捕鱼捞虾，撑船摆渡
+
+buildingTypes:
+  - id: courtyard
+    name: 四合院
+    visual: "🏯 白墙黛瓦，天井庭院"
+    type: residential
+  - id: teahouse
+    name: 茶肆
+    visual: "🍵 临水而建，竹帘木窗"
+    type: social
+  - id: temple
+    name: 寺庙
+    visual: "🛕 飞檐翘角，香火缭绕"
+    type: religious
+  - id: workshop
+    name: 作坊
+    visual: "🔨 砖木结构，前店后坊"
+    type: crafting
+  - id: market
+    name: 集市
+    visual: "📦 沿河长街，摊贩密集"
+    type: commercial
+  - id: academy
+    name: 书院
+    visual: "📚 竹林环绕，古柏森森"
+    type: educational
+
+clothingPalette:
+  male:
+    - "直裰长衫"
+    - "幞头巾子"
+    - "布袜布鞋"
+    - "腰带"
+  female:
+    - "褙子襦裙"
+    - "披帛"
+    - "步摇簪子"
+    - "绣花鞋"
+  forbidden:
+    - "西装"
+    - "旗袍"
+    - "现代服饰"
+
+dialogueStyle: |
+  使用古典中文风格：
+  - 语气文雅，多用成语典故
+  - 提及诗词、茶道、琴棋书画
+  - 问候用"久仰""失敬""托福"
+  - 避免现代白话和网络用语
+
+forbiddenConcepts:
+  - 电力
+  - 汽车
+  - 电话
+  - 飞机
+  - 西医
+  - 民主
+  - 科技
+  - 塑料
+
+startingConditions:
+  population: 60
+  season: spring
+  hour: 6
+  weather: misty

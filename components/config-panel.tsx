@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, X, Key, Database, Clock, Users } from "lucide-react";
+import { Settings, X, Key, Database, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ConfigPanelProps {
@@ -17,6 +17,7 @@ export function ConfigPanel({ isOpen, onClose }: ConfigPanelProps) {
   const [model, setModel] = useState("claude-sonnet-4");
   const [population, setPopulation] = useState(12);
   const [eraPack, setEraPack] = useState("18th_england");
+  const [isCreating, setIsCreating] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -31,6 +32,36 @@ export function ConfigPanel({ isOpen, onClose }: ConfigPanelProps) {
     localStorage.setItem("pixel_town_api_key", apiKey);
     localStorage.setItem("pixel_town_model", model);
     alert("配置已保存到浏览器本地存储");
+  };
+
+  // Create world handler
+  const handleCreateWorld = async () => {
+    setIsCreating(true);
+    try {
+      const response = await fetch("/api/world", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "新世界",
+          eraPack,
+          population,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("World created:", data);
+        alert(`世界创建成功！已生成 ${population} 个居民`);
+      } else {
+        const error = await response.json();
+        alert(`创建失败: ${error.error}`);
+      }
+    } catch (error) {
+      console.error("Failed to create world:", error);
+      alert("创建世界时出错");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const tabs = [
@@ -211,6 +242,19 @@ export function ConfigPanel({ isOpen, onClose }: ConfigPanelProps) {
                   className="w-full px-3 py-2 rounded-md border border-input bg-background"
                 />
               </div>
+
+              <button
+                onClick={handleCreateWorld}
+                disabled={isCreating}
+                className={cn(
+                  "w-full px-4 py-2 rounded-md font-medium transition-colors",
+                  isCreating
+                    ? "bg-muted text-muted-foreground cursor-not-allowed"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                )}
+              >
+                {isCreating ? "创建中..." : "创建世界"}
+              </button>
 
               <div className="p-3 bg-muted rounded-md">
                 <h4 className="font-medium text-sm mb-2">当前时代: 18世纪末英国乡村</h4>

@@ -1,207 +1,184 @@
 import { Memory, AgentState } from "@/lib/types";
+import {
+  MemoryRepository,
+  reflectionRepo,
+  CreateMemoryInput,
+  memoryRepo,
+} from "@/db/memory-repository";
+import { getLLMClient } from "@/lib/llm/client";
 
-// Short-term memory: lasts ~10 ticks
-const STM_DURATION_TICKS = 10;
-
-// Importance threshold for LTM promotion
-const LTM_IMPORTANCE_THRESHOLD = 0.6;
-
-// Maximum STM size per agent
-const MAX_STM_SIZE = 50;
+// In-memory cache for STM (Short-Term Memory)
+const stmCache: Map<string, Memory[]> = new Map();
+const STM_CACHE_SIZE = 20;
+const STM_TICK_WINDOW = 50;
 
 export class MemoryManager {
-  private stm: Map<string, Memory[]> = new Map(); // agentId -> memories
-  private ltm: Map<string, Memory[]> = new Map(); // agentId -> memories
+  private repo: MemoryRepository;
 
-  // Add a new memory
-  addMemory(
-    agentId: string,
-    content: string,
-    type: Memory["type"],
-    importance: number,
-    relatedAgentIds: string[] = [],
-    metadata: Record<string, unknown> = {}
-  ): Memory {
-    const memory: Memory = {
-      id: generateId(),
-      agentId,
-      content,
-      type,
-      importance,
-      timestamp: Date.now(),
-      tickCreated: this.getCurrentTick(),
-      relatedAgentIds,
-      metadata,
-    };
+  constructor(repo: MemoryRepository = memoryRepo) {
+    this.repo = repo;
+  }
 
-    // Add to STM
-    const agentStm = this.stm.get(agentId) || [];
+  // Add a new memory (stores to DB and caches in STM)
+  async addMemory(input: CreateMemoryInput): Promise<Memory> {
+    const memory = await this.repo.create(input);
+
+    // Update STM cache
+    const agentStm = stmCache.get(input.agentId) || [];
     agentStm.push(memory);
 
     // Enforce STM size limit
-    if (agentStm.length > MAX_STM_SIZE) {
-      const removed = agentStm.shift(); // Remove oldest
-      if (removed && removed.importance >= LTM_IMPORTANCE_THRESHOLD) {
-        // Promote important old memories to LTM
-        this.addToLTM(agentId, removed);
-      }
+    if (agentStm.length > STM_CACHE_SIZE) {
+      agentStm.shift();
     }
-
-    this.stm.set(agentId, agentStm);
-
-    // High importance memories go directly to LTM
-    if (importance >= LTM_IMPORTANCE_THRESHOLD) {
-      this.addToLTM(agentId, memory);
-    }
+    stmCache.set(input.agentId, agentStm);
 
     return memory;
   }
 
-  // Get all memories for an agent (STM + LTM)
-  getAllMemories(agentId: string): Memory[] {
-    const stm = this.stm.get(agentId) || [];
-    const ltm = this.ltm.get(agentId) || [];
-    return [...stm, ...ltm];
+  // Get all memories for an agent (from DB)
+  async getAllMemories(agentId: string): Promise<Memory[]> {
+    return await this.repo.getByAgent(agentId);
   }
 
-  // Get recent memories (STM)
-  getRecentMemories(agentId: string, limit: number = 10): Memory[] {
-    const stm = this.stm.get(agentId) || [];
-    return stm.slice(-limit).reverse();
+  // Get STM (recent + important from cache, fallback to DB)
+  async getSTM(agentId: string, currentTick: number, limit: number = 20): Promise<Memory[]> {
+    // Try cache first for very recent
+    const cached = stmCache.get(agentId) || [];
+    const recentCached = cached.filter((m) => currentTick - m.tick < STM_TICK_WINDOW);
+
+    if (recentCached.length >= limit) {
+      return recentCached.slice(-limit).reverse();
+    }
+
+    // Load from DB
+    const dbMemories = await this.repo.getSTM(agentId, currentTick, limit);
+
+    // Update cache
+    stmCache.set(agentId, dbMemories.slice(0, STM_CACHE_SIZE));
+
+    return dbMemories;
   }
 
-  // Get important memories (LTM)
-  getImportantMemories(agentId: string, minImportance: number = 0.7): Memory[] {
-    const ltm = this.ltm.get(agentId) || [];
-    return ltm.filter((m) => m.importance >= minImportance);
+  // Get LTM (important memories from DB)
+  async getLTM(agentId: string, currentTick: number, limit: number = 30): Promise<Memory[]> {
+    return await this.repo.getLTM(agentId, currentTick, limit);
   }
 
-  // Search memories by content (simple keyword search for now)
-  searchMemories(agentId: string, query: string): Memory[] {
-    const all = this.getAllMemories(agentId);
-    const keywords = query.toLowerCase().split(" ");
-    return all.filter((m) =>
-      keywords.some((kw) => m.content.toLowerCase().includes(kw))
-    );
+  // Search memories
+  async searchMemories(agentId: string, query: string): Promise<Memory[]> {
+    return await this.repo.search(agentId, query);
   }
 
-  // Get memories about a specific agent
-  getMemoriesAbout(agentId: string, targetAgentId: string): Memory[] {
-    const all = this.getAllMemories(agentId);
-    return all.filter(
-      (m) =>
-        m.relatedAgentIds.includes(targetAgentId) ||
-        m.content.includes(targetAgentId)
-    );
+  // Get memories about specific agents
+  async getMemoriesAbout(agentId: string, targetAgentIds: string[]): Promise<Memory[]> {
+    return await this.repo.getRelatedToAgents(agentId, targetAgentIds);
   }
 
-  // Decay old STM memories
-  decayMemories(currentTick: number): void {
-    for (const [agentId, memories] of this.stm.entries()) {
-      const validMemories = memories.filter(
-        (m) => currentTick - m.tickCreated < STM_DURATION_TICKS
-      );
+  // Access a memory (updates last accessed)
+  async accessMemory(memoryId: string, currentTick: number): Promise<void> {
+    await this.repo.updateLastAccessed(memoryId, currentTick);
+  }
 
-      // Promote decaying important memories to LTM
-      const decaying = memories.filter(
-        (m) => currentTick - m.tickCreated >= STM_DURATION_TICKS
-      );
-      for (const memory of decaying) {
-        if (memory.importance >= LTM_IMPORTANCE_THRESHOLD) {
-          this.addToLTM(agentId, memory);
-        }
-      }
-
-      if (validMemories.length !== memories.length) {
-        this.stm.set(agentId, validMemories);
+  // Decay old memories
+  async decayMemories(agentId: string, currentTick: number): Promise<number> {
+    // Clear old cache entries
+    const stm = stmCache.get(agentId);
+    if (stm) {
+      const valid = stm.filter((m) => currentTick - m.tick < STM_TICK_WINDOW);
+      if (valid.length !== stm.length) {
+        stmCache.set(agentId, valid);
       }
     }
+
+    // Decay DB memories (keep top 100)
+    return await this.repo.decay(agentId, currentTick, 100);
   }
 
-  // Clear all memories for an agent
-  clearMemories(agentId: string): void {
-    this.stm.delete(agentId);
-    this.ltm.delete(agentId);
+  // Clear agent memories
+  async clearMemories(agentId: string): Promise<void> {
+    stmCache.delete(agentId);
+    await this.repo.clear(agentId);
   }
 
-  private addToLTM(agentId: string, memory: Memory): void {
-    const agentLtm = this.ltm.get(agentId) || [];
-    // Avoid duplicates
-    if (!agentLtm.some((m) => m.id === memory.id)) {
-      agentLtm.push(memory);
-      this.ltm.set(agentId, agentLtm);
-    }
-  }
-
-  private getCurrentTick(): number {
-    // This will be injected from the game loop
-    return (global as unknown as { currentGameTick?: number }).currentGameTick || 0;
+  // Get memory count
+  async getMemoryCount(agentId: string): Promise<number> {
+    return await this.repo.getCount(agentId);
   }
 }
 
-// Reflection system
+// Reflection engine
 export class ReflectionEngine {
-  constructor(private memoryManager: MemoryManager) {}
+  private memoryManager: MemoryManager;
 
-  // Generate a reflection based on recent experiences
-  async reflect(agentId: string, agentState: AgentState): Promise<string | null> {
-    const recentMemories = this.memoryManager.getRecentMemories(agentId, 20);
+  constructor(memoryManager: MemoryManager = new MemoryManager()) {
+    this.memoryManager = memoryManager;
+  }
 
-    if (recentMemories.length < 5) {
-      return null; // Not enough experiences to reflect on
+  // Generate reflection based on recent experiences
+  async reflect(agentId: string, agentState: AgentState, currentTick: number): Promise<string | null> {
+    const recentMemories = await this.memoryManager.getSTM(agentId, currentTick, 30);
+
+    if (recentMemories.length < 10) {
+      return null; // Not enough experiences
     }
 
-    // Check if there are patterns or recurring themes
-    const patterns = this.identifyPatterns(recentMemories);
+    // Use LLM to generate reflection
+    try {
+      const llm = getLLMClient();
 
-    if (patterns.length > 0) {
-      const reflection = `我最近注意到：${patterns.join("，")}`;
+      const memorySummary = recentMemories
+        .slice(0, 15)
+        .map((m) => `- ${m.type}: ${m.content}`)
+        .join("\n");
 
-      // Store reflection as a high-importance memory
-      this.memoryManager.addMemory(
+      const systemPrompt = `You are analyzing a person's recent experiences to identify patterns or insights.
+Generate a brief reflection (1-2 sentences) about what this person might be noticing or learning.
+Be specific and grounded in the experiences. Return only the reflection text.`;
+
+      const prompt = `Recent experiences:\n${memorySummary}\n\nWhat pattern or insight might this person have?`;
+
+      const reflection = await llm.generateText(prompt, systemPrompt);
+      const trimmedReflection = reflection.trim();
+
+      // Store as reflection in DB
+      const sourceIds = recentMemories.map((m) => m.id);
+      await reflectionRepo.create(
         agentId,
-        reflection,
-        "reflection",
-        0.8,
-        [],
-        { patterns }
+        trimmedReflection,
+        sourceIds,
+        currentTick,
+        "behavior_preference"
       );
 
-      return reflection;
-    }
+      // Also store as high-importance memory
+      await this.memoryManager.addMemory({
+        agentId,
+        type: "reflection",
+        content: trimmedReflection,
+        importance: 0.8,
+        tick: currentTick,
+      });
 
-    return null;
+      return trimmedReflection;
+    } catch (error) {
+      console.error("Reflection generation failed:", error);
+      return null;
+    }
   }
 
-  private identifyPatterns(memories: Memory[]): string[] {
-    const patterns: string[] = [];
+  // Get reflections for an agent
+  async getReflections(agentId: string, limit: number = 10) {
+    return await reflectionRepo.getByAgent(agentId, limit);
+  }
 
-    // Simple pattern detection
-    const activityCounts = new Map<string, number>();
-    for (const m of memories) {
-      if (m.type === "action" || m.type === "dialogue") {
-        const key = m.metadata?.activity as string;
-        if (key) {
-          activityCounts.set(key, (activityCounts.get(key) || 0) + 1);
-        }
-      }
-    }
-
-    // Report activities done more than 3 times
-    for (const [activity, count] of activityCounts.entries()) {
-      if (count >= 3) {
-        patterns.push(`我经常${activity}（${count}次）`);
-      }
-    }
-
-    return patterns;
+  // Check if agent should reflect (every ~100 ticks)
+  shouldReflect(currentTick: number, lastReflectionTick?: number): boolean {
+    if (!lastReflectionTick) return currentTick > 50;
+    return currentTick - lastReflectionTick >= 100;
   }
 }
 
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-// Global memory manager instance
+// Global instances
 export const memoryManager = new MemoryManager();
-export const reflectionEngine = new ReflectionEngine(memoryManager);
+export const reflectionEngine = new ReflectionEngine();

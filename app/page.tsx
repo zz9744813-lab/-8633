@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { WorldView } from "@/components/world-view";
 import { TimeBar, GameSpeed } from "@/components/time-bar";
 import { ConfigPanel } from "@/components/config-panel";
+import { MemoryViewer } from "@/components/memory-viewer";
 import { cn } from "@/lib/utils";
-import { Settings, Activity } from "lucide-react";
+import { Settings, Activity, Brain } from "lucide-react";
 
 interface AgentState {
   id: string;
@@ -51,6 +52,7 @@ export default function Home() {
   const [isPaused, setIsPaused] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<AgentState | null>(null);
+  const [isMemoryOpen, setIsMemoryOpen] = useState(false);
 
   // SSE connection ref
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -269,6 +271,13 @@ export default function Home() {
                   <span>({selectedAgent.x.toFixed(0)}, {selectedAgent.y.toFixed(0)})</span>
                 </div>
               </div>
+              <button
+                onClick={() => setIsMemoryOpen(true)}
+                className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-md text-sm font-medium transition-colors"
+              >
+                <Brain className="w-4 h-4" />
+                查看记忆
+              </button>
             </div>
           ) : (
             <div className="p-4 border rounded-lg bg-muted/50 text-center text-muted-foreground text-sm">
@@ -321,6 +330,15 @@ export default function Home() {
 
       {/* Config panel */}
       <ConfigPanel isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} />
+
+      {/* Memory viewer */}
+      <MemoryViewer
+        agentId={selectedAgent?.id || ""}
+        agentName={selectedAgent?.name || ""}
+        isOpen={isMemoryOpen}
+        onClose={() => setIsMemoryOpen(false)}
+        currentTick={worldState?.tick || 0}
+      />
     </div>
   );
 }

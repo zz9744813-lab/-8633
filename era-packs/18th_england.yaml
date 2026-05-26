@@ -1,0 +1,135 @@
+id: 18th_england
+name: 18世纪英格兰小镇
+yearStart: 1780
+calendar: gregorian
+
+description: |
+  工业革命初期的英格兰乡村小镇。
+  蒸汽机尚未普及，马车是主要交通工具。
+  社会结构分明：贵族、商人、工匠、农民。
+
+worldPrompt: |
+  你生活在18世纪末的英格兰小镇。
+  这是乔治三世统治时期，美国独立战争刚结束不久。
+  镇上的人们主要务农、做手工艺或做小生意。
+  教堂是社区中心，每周日大家都会去礼拜。
+  科技水平：马车、蜡烛、铁器、印刷术。
+  社会规范：等级分明，重视礼仪，男女分工明确。
+
+occupations:
+  - id: farmer
+    name: 农民
+    workplace: farm
+    description: 耕种土地，种植小麦、大麦等作物
+  - id: blacksmith
+    name: 铁匠
+    workplace: smithy
+    description: 锻造农具、马蹄铁和简单的金属制品
+  - id: innkeeper
+    name: 酒馆老板
+    workplace: tavern
+    description: 经营酒馆，为旅人提供食宿和酒水
+  - id: merchant
+    name: 商人
+    workplace: market
+    description: 买卖商品，可能是布料、香料或日用品
+  - id: priest
+    name: 牧师
+    workplace: church
+    description: 主持礼拜，为社区居民提供精神指导
+  - id: weaver
+    name: 织工
+    workplace: cottage
+    description: 在家织布，制作衣物和布料
+  - id: carpenter
+    name: 木匠
+    workplace: workshop
+    description: 制作家具、房屋结构和其他木制品
+  - id: baker
+    name: 面包师
+    workplace: bakery
+    description: 烤制面包和糕点
+
+buildingTypes:
+  - id: cottage
+    name: 农舍
+    visual: "🏠 茅草屋顶，石墙，烟囱冒着烟"
+    type: residential
+  - id: tavern
+    name: 酒馆
+    visual: "🍺 两层木建筑，挂着酒桶招牌"
+    type: social
+  - id: church
+    name: 教堂
+    visual: "⛪ 石砌建筑，尖塔高耸"
+    type: religious
+  - id: smithy
+    name: 铁匠铺
+    visual: "🔨 砖石结构，烟囱终日冒烟"
+    type: crafting
+  - id: market
+    name: 集市
+    visual: "📦 露天摊位，帐篷和推车"
+    type: commercial
+  - id: manor
+    name: 庄园
+    visual: "🏰 宏伟的石砌建筑，带花园"
+    type: residential
+
+clothingPalette:
+  male:
+    - "棕色羊毛外套"
+    - "白色亚麻衬衫"
+    - "深色马裤"
+    - "三角帽"
+    - "皮革长靴"
+  female:
+    - "棉质长裙"
+    - "白色围裙"
+    - "披肩"
+    - "草帽"
+    - "软帽"
+  forbidden:
+    - "牛仔裤"
+    - "T恤"
+    - "运动鞋"
+    - "合成纤维"
+
+dialogueStyle: |
+  使用18世纪的英式英语风格：
+  - 使用 "thee", "thou", "thy" 等古英语词汇（可选）
+  - 语气正式但有乡土气息
+  - 提及天气、收成、教会事务
+  - 避免现代词汇如 "OK", "cool", "phone" 等
+
+forbiddenConcepts:
+  - 电力
+  - 汽车
+  - 电话
+  - 互联网
+  - 飞机
+  - 塑料
+  - 现代医疗
+  - 民主选举
+  - 女权主义
+  - 社会主义
+
+startingConditions:
+  population: 50
+  season: spring
+  hour: 6
+  weather: clear
+
+agentGeneration:
+  namePool:
+    male:
+      - ["William", "John", "Thomas", "James", "George", "Henry", "Charles", "Edward"]
+      - ["Smith", "Brown", "Wilson", "Johnson", "Davis", "Clark", "Wright", "Green"]
+    female:
+      - ["Mary", "Elizabeth", "Sarah", "Ann", "Jane", "Martha", "Catherine", "Margaret"]
+      - ["Smith", "Brown", "Wilson", "Johnson", "Davis", "Clark", "Wright", "Green"]
+  personalityTemplates:
+    - ["勤劳", "虔诚", "节俭"]
+    - ["健谈", "热心", "好奇"]
+    - ["严肃", "正直", "固执"]
+    - ["温和", "善良", "害羞"]

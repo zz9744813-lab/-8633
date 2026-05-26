@@ -2,6 +2,7 @@ id: 18th_england
 name: 18世纪英格兰小镇
 yearStart: 1780
 calendar: gregorian
+narrative_intensity: 0.3
 
 description: |
   工业革命初期的英格兰乡村小镇。

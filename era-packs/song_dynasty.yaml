@@ -2,6 +2,7 @@ id: song_dynasty
 name: 宋朝江南水乡
 yearStart: 1080
 calendar: lunar
+narrative_intensity: 0.3
 
 description: |
   北宋中期的江南水乡。

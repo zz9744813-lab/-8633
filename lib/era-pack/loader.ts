@@ -8,6 +8,7 @@ const EraPackSchema = z.object({
   name: z.string(),
   yearStart: z.number(),
   calendar: z.string(),
+  narrativeIntensity: z.number().min(0).max(1).default(0.3),
   description: z.string(),
   worldPrompt: z.string(),
   occupations: z.array(z.object({

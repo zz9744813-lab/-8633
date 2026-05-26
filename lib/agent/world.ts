@@ -328,6 +328,12 @@ export class World {
       }
     }
 
+    // === F1: Daily summary generation (23:50 触发) ===
+    if (hour === 23 && minute === 50) {
+      const dayNumber = Math.floor(this.tickCount / 144);
+      await chronicleEngine.generateDailySummary(this, dayNumber);
+    }
+
     // === W6: Auto save (每 50 ticks) ===
     if (this.tickCount % 50 === 0 && this.tickCount > 0) {
       try {

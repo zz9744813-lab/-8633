@@ -11,7 +11,8 @@ export type ChronicleType =
   | "war"
   | "disaster"
   | "milestone"
-  | "achievement";
+  | "achievement"
+  | "daily_summary";
 
 export interface CreateChronicleInput {
   worldId: string;

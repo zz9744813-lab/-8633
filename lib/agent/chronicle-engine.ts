@@ -1,6 +1,10 @@
 import { ChronicleRepository, chronicleRepo, ChronicleType } from "@/db/chronicle-repository";
 import { World } from "@/lib/agent/world";
 import { Agent } from "@/lib/agent/agent";
+import { memoryManager } from "./memory";
+import { worldEventSystem } from "@/db/world-event-repository";
+import { getLLMClient } from "@/lib/llm/client";
+import { z } from "zod";
 
 // Season mapping from tick
 function getSeasonFromTick(tick: number): string {
@@ -228,6 +232,120 @@ export class ChronicleEngine {
     const day = dayOfYear + 1;
     const season = getSeasonFromTick(tick);
     return { year, season, day };
+  }
+
+  // F1: Generate daily summary in chronicle style
+  async generateDailySummary(world: World, dayNumber: number): Promise<void> {
+    const agents = Array.from(world.agents.values());
+    if (agents.length === 0) return;
+
+    // Collect important memories from all agents (importance >= 0.5)
+    const allImportantMemories: Array<{
+      agentName: string;
+      content: string;
+      importance: number;
+      tick: number;
+    }> = [];
+
+    for (const agent of agents) {
+      const memories = await memoryManager.getSTM(agent.id, world.tickCount, 50);
+      const importantMemories = memories.filter((m) => m.importance >= 0.5);
+      for (const memory of importantMemories) {
+        allImportantMemories.push({
+          agentName: agent.identity.name,
+          content: memory.content,
+          importance: memory.importance,
+          tick: memory.tick,
+        });
+      }
+    }
+
+    // Sort by importance and take top 20
+    allImportantMemories.sort((a, b) => b.importance - a.importance);
+    const topMemories = allImportantMemories.slice(0, 20);
+
+    // Collect today's world events
+    const dayStartTick = dayNumber * 144;
+    const dayEndTick = (dayNumber + 1) * 144;
+    const recentEvents = await worldEventSystem.getRecentEvents(world.id, 20);
+    const todayEvents = recentEvents.filter(
+      (e) => e.tick >= dayStartTick && e.tick < dayEndTick
+    );
+
+    // Get era pack context
+    const eraPack = world.eraPack;
+    const worldPrompt = eraPack?.worldPrompt ?? "你生活在一个小镇上。";
+    const dialogueStyle = eraPack?.dialogueStyle ?? "";
+
+    // Build system prompt
+    const systemPrompt = `${worldPrompt}
+
+你是这个小镇的史官，写"县志"，风格简练有"史书感"。
+${dialogueStyle}
+
+要求：
+- 输出 3-6 条纪事，每条 30-80 字
+- 使用中文，文言或半文言风格
+- 以"是日，本镇..."开头
+- 记录当天重要事件、人物活动
+- 风格庄重、简练，有历史感`;
+
+    // Build user prompt
+    const memoriesText = topMemories
+      .map((m) => `- ${m.agentName}: ${m.content}`)
+      .join("\n");
+    const eventsText = todayEvents
+      .map((e) => `- ${e.type}: ${e.description}`)
+      .join("\n") || "无";
+
+    const prompt = `请根据以下第 ${dayNumber} 天的记录，撰写一份县志风格的每日总结：
+
+【重要人物活动】
+${memoriesText}
+
+【世界事件】
+${eventsText}
+
+请输出 3-6 条纪事，每条独立成段，30-80 字。`;
+
+    try {
+      const llm = getLLMClient();
+
+      const DailySummarySchema = z.object({
+        entries: z
+          .array(z.string().min(10).max(100))
+          .min(3)
+          .max(6)
+          .describe("3-6 条纪事，每条 30-80 字"),
+      });
+
+      const result = await llm.generateObject(prompt, DailySummarySchema, systemPrompt);
+
+      // Combine entries into description
+      const description = result.entries.join("\n\n");
+
+      const { year, season, day } = this.getGameDate(world.tickCount);
+
+      await this.repo.create({
+        worldId: world.id,
+        tick: world.tickCount,
+        year,
+        season,
+        day,
+        type: "daily_summary" as ChronicleType,
+        title: `第 ${dayNumber} 日纪事`,
+        description,
+        importance: 0.6,
+        metadata: {
+          dayNumber,
+          entryCount: result.entries.length,
+        },
+      });
+
+      console.log(`[Chronicle] Daily summary generated for day ${dayNumber}`);
+    } catch (error) {
+      console.error("[Chronicle] Failed to generate daily summary:", error);
+    }
   }
 }
 

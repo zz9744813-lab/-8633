@@ -42,6 +42,12 @@ export class DramaEngine {
     const agents = Array.from(world.agents.values());
     if (agents.length < 3) return null; // Need at least 3 agents for drama
 
+    // Calculate interval based on narrative intensity (default 0.3)
+    const dayNumber = Math.floor(world.tickCount / 144);
+    const intensity = world.eraPack?.narrativeIntensity ?? 0.3;
+    const interval = Math.round(7 - 5 * intensity);
+    if (dayNumber % interval !== 0) return null;
+
     // Check each drama type
     const checks = [
       this.checkLoveTriangle(world, agents),

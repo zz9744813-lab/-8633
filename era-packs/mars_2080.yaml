@@ -2,6 +2,7 @@ id: mars_2080
 name: 2080火星殖民地
 yearStart: 2080
 calendar: earth_standard
+narrative_intensity: 0.5
 
 description: |
   2080年的火星殖民地，人类已在火星建立永久定居点。

@@ -2,6 +2,7 @@ id: edo_japan
 name: 江户时代宿场町
 yearStart: 1750
 calendar: japanese_lunar
+narrative_intensity: 0.2
 
 description: |
   江户时代的日本宿场町（驿站城镇）。

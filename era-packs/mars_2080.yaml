@@ -93,9 +93,9 @@ clothingPalette:
     - "没有辐射防护的衣物"
 
 languages:
-  - English
-  - 中文
-  - Русский
+  - { id: standard,      name: Standard,     distribution: 0.9 }
+  - { id: martian_slang, name: Martian Slang, distribution: 0.4 }
+  - { id: tech_code,     name: Tech Code,    distribution: 0.15 }
 
 dialogueStyle: |
   使用科幻风格的专业术语：

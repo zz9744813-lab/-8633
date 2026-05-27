@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getWorld } from "@/lib/agent";
-import { loadEraPack, generateAgentIdentity } from "@/lib/era-pack/loader";
+import { loadEraPack, generateAgentIdentity, pickLanguages } from "@/lib/era-pack/loader";
 import { memoryManager } from "@/lib/agent/memory";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
             distinguishingFeatures: [],
           },
           initialGoals: ["谋生", "社交"],
-          language: eraPack.languages?.[Math.floor(Math.random() * (eraPack.languages?.length ?? 1))] ?? eraPack.languages?.[0],
+          knownLanguages: pickLanguages(eraPack, identity.occupation.id),
         }, position);
 
         result = {

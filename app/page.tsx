@@ -35,7 +35,7 @@ interface AgentState {
   inventory?: Record<string, number>;
   portraitUrl?: string;
   appearance?: { description?: string; hairColor?: string; skinTone?: string; distinguishingFeatures?: string[] };
-  language?: string;
+  knownLanguages?: string[];
   dailyPlan?: { morningThought: string; steps: { time: string; description: string }[]; currentStepIdx: number };
 }
 
@@ -138,7 +138,7 @@ export default function Home() {
               dir: a.state.position.dir,
               money: a.state.money,
               inventory: a.state.inventory,
-              language: a.identity.language,
+              knownLanguages: a.identity.knownLanguages,
               dailyPlan: a.dailyPlan,
               portraitUrl: a.identity.portraitUrl,
               appearance: a.identity.appearance,
@@ -342,12 +342,13 @@ export default function Home() {
               <h3 className="font-bold flex items-center gap-2 mb-3">
                 <Activity className="w-4 h-4" />
                 {selectedAgent.name}
-                {selectedAgent.language && (
-                  <span className="text-xs font-normal px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">
-                    {selectedAgent.language}
-                  </span>
-                )}
               </h3>
+              <div className="text-xs mb-2">
+                <span className="text-muted-foreground">会说：</span>
+                {(selectedAgent.knownLanguages ?? ["common"]).map(l =>
+                  <span key={l} className="inline-block bg-muted rounded px-1 mx-0.5">{l}</span>
+                )}
+              </div>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">活动</span>

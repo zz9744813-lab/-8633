@@ -105,8 +105,9 @@ clothingPalette:
     - "现代发型"
 
 languages:
-  - 日本語
-  - 上方語
+  - { id: common_jp, name: 共通語, distribution: 0.85 }
+  - { id: kansai,    name: 関西弁, distribution: 0.5 }
+  - { id: dutch,     name: オランダ語, distribution: 0.05 }
 
 dialogueStyle: |
   使用江户时代的日语风格：

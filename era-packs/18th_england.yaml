@@ -121,8 +121,9 @@ clothingPalette:
     - "合成纤维"
 
 languages:
-  - English
-  - French
+  - { id: common,  name: 通话,   distribution: 0.85 }
+  - { id: dialect, name: 乡音,   distribution: 0.6 }
+  - { id: latin,   name: 拉丁文, distribution: 0.1 }
 
 dialogueStyle: |
   使用18世纪的英式英语风格：

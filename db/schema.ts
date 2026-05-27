@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 import { relations } from "drizzle-orm";
 
 // ============ Worlds ============
@@ -54,6 +55,11 @@ export const agents = sqliteTable("agents", {
   // Position (denormalized for easy access)
   positionX: real("position_x").default(0),
   positionY: real("position_y").default(0),
+
+  // Languages
+  knownLanguages: text("known_languages", { mode: "json" })
+    .$type<string[]>()
+    .default(sql`'["common"]'`),
 
   // Visual
   spriteUrl: text("sprite_url"),

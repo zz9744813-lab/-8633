@@ -568,6 +568,8 @@ What do you want to do next?`;
       eraPack: this.eraPack,
     });
 
+    if (!result) return null;
+
     return {
       speakerText: result.speakerText,
       listenerResponse: result.listenerResponse,

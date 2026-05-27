@@ -112,8 +112,9 @@ clothingPalette:
     - "现代服饰"
 
 languages:
-  - 文言
-  - 官话
+  - { id: common, name: 通话, distribution: 0.85 }
+  - { id: dialect, name: 方言, distribution: 0.6 }
+  - { id: classical, name: 文言, distribution: 0.1 }
 
 dialogueStyle: |
   使用古典中文风格：

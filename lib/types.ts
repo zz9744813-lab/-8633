@@ -31,7 +31,7 @@ export type AgentIdentity = {
   childIds?: string[];
   spouseId?: string;
   portraitUrl?: string;
-  language?: string;
+  knownLanguages?: string[];
 };
 
 export type AgentState = {
@@ -142,7 +142,7 @@ export type EraPack = {
     forbidden: string[];
   };
   dialogueStyle: string;
-  languages: string[];
+  languages: { id: string; name: string; distribution: number }[];
   forbiddenConcepts: string[];
 };
 

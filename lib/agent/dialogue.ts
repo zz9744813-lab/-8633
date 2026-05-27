@@ -29,7 +29,44 @@ export interface DialogueResult {
 
 export class DialogueSystem {
   // Generate a conversation between two agents
-  async generateDialogue(context: DialogueContext): Promise<DialogueResult> {
+  async generateDialogue(context: DialogueContext): Promise<DialogueResult | null> {
+    // H3: Language intersection check
+    const langA = context.speaker.identity.knownLanguages ?? ["common"];
+    const langB = context.listener.identity.knownLanguages ?? ["common"];
+    const shared = langA.filter(l => langB.includes(l));
+    if (shared.length === 0) {
+      const speakerName = context.speaker.identity.name;
+      const listenerName = context.listener.identity.name;
+      // Write observation memories for both agents
+      await memoryManager.addMemory({
+        agentId: context.speaker.id,
+        type: "observation",
+        content: `你和 ${listenerName} 相遇，但语言不通，只能比划。`,
+        importance: 0.4,
+        tick: context.currentTick,
+        relatedAgentIds: [context.listener.id],
+      });
+      await memoryManager.addMemory({
+        agentId: context.listener.id,
+        type: "observation",
+        content: `你和 ${speakerName} 相遇，但语言不通，只能比划。`,
+        importance: 0.4,
+        tick: context.currentTick,
+        relatedAgentIds: [context.speaker.id],
+      });
+      // Update relationship: familiarity +0.05, affinity unchanged
+      await relationshipManager.recordPositiveInteraction(
+        context.speaker.id,
+        context.listener.id,
+        "相遇但语言不通",
+        0.05,
+        context.currentTick
+      );
+      return null;
+    }
+    const lang = shared[0];
+    const langName = context.eraPack?.languages?.find(l => l.id === lang)?.name ?? lang;
+
     const llm = getLLMClientFor("dialogue");
 
     // Get relationship info
@@ -240,11 +277,14 @@ Respond with JSON:
       prompt += `\n\n${context.eraPack.worldPrompt}\n\n【对话风格约束】\n${context.eraPack.dialogueStyle}\n\n【绝对禁止提及】\n${context.eraPack.forbiddenConcepts.join("、")}`;
     }
 
-    // H3: Language barrier check
-    const speakerLang = context.speaker.identity.language;
-    const listenerLang = context.listener.identity.language;
-    if (speakerLang && listenerLang && speakerLang !== listenerLang) {
-      prompt += `\n\n【语言障碍】${context.speaker.identity.name} speaks ${speakerLang} but ${context.listener.identity.name} speaks ${listenerLang}. Communication is difficult — use simple words, gestures, or attempt the other's language.`;
+    // H3: Language context — compute shared language and add to prompt
+    const langA2 = context.speaker.identity.knownLanguages ?? ["common"];
+    const langB2 = context.listener.identity.knownLanguages ?? ["common"];
+    const shared2 = langA2.filter(l => langB2.includes(l));
+    if (shared2.length > 0) {
+      const lang2 = shared2[0];
+      const langName2 = context.eraPack?.languages?.find(l => l.id === lang2)?.name ?? lang2;
+      prompt += `\n\n【交流语言】他们用 ${langName2} 交流，请体现这个语言的语域。`;
     }
 
     prompt += "\n\nRespond naturally and concisely. Use your character's voice and perspective.";

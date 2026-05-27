@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createWorldOrLoad, getWorld, destroyWorld, setWorld } from "@/lib/agent";
-import { loadEraPack, generateAgentIdentity } from "@/lib/era-pack/loader";
+import { loadEraPack, generateAgentIdentity, pickLanguages } from "@/lib/era-pack/loader";
 import { AgentIdentity, Building } from "@/lib/types";
 import { generatePortrait } from "@/lib/sprite-generator";
 import { worldRepository } from "@/db/world-repository";
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
             distinguishingFeatures: [],
           },
           initialGoals: ["谋生", "社交"],
-          language: eraPack.languages?.[Math.floor(Math.random() * (eraPack.languages?.length ?? 1))] ?? eraPack.languages?.[0],
+          knownLanguages: pickLanguages(eraPack, identity.occupation.id),
         };
         world.addAgent(`agent-${i}-${Date.now()}`, agentIdentity);
       }

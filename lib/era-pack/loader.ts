@@ -3,6 +3,12 @@ import { join } from "path";
 import yaml from "js-yaml";
 import { z } from "zod";
 
+const LanguageSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  distribution: z.number().min(0).max(1),
+});
+
 const EraPackSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -32,7 +38,7 @@ const EraPackSchema = z.object({
     forbidden: z.array(z.string()),
   }),
   dialogueStyle: z.string(),
-  languages: z.array(z.string()),
+  languages: z.array(LanguageSchema).default([]),
   forbiddenConcepts: z.array(z.string()),
   startingConditions: z.object({
     population: z.number(),
@@ -153,6 +159,25 @@ export function validateEraPack(eraPack: EraPack): string[] {
   }
 
   return errors;
+}
+
+export function pickLanguages(eraPack: EraPack, occupationId: string): string[] {
+  const known: string[] = [];
+  for (const lang of eraPack.languages ?? []) {
+    if (lang.id === "common" || lang.id === "standard" || lang.id === "common_jp") {
+      if (Math.random() < lang.distribution) known.push(lang.id);
+      continue;
+    }
+    if (lang.id === "latin" || lang.id === "classical" || lang.id === "文言") {
+      if (["scholar", "minister", "schoolmaster", "official", "monk", "priest", "physician", "僧侣", "书生", "郎中"].includes(occupationId)) {
+        known.push(lang.id);
+      }
+      continue;
+    }
+    if (Math.random() < lang.distribution) known.push(lang.id);
+  }
+  if (known.length === 0) known.push(eraPack.languages?.[0]?.id ?? "common");
+  return known;
 }
 
 export function lintEraOutput(text: string, eraPack: EraPack): {

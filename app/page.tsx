@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { WorldView } from "@/components/world-view";
+import { AgentPortrait } from "@/components/agent-portrait";
 import { TimeBar, GameSpeed } from "@/components/time-bar";
 import { ConfigPanel } from "@/components/config-panel";
 import { MemoryViewer } from "@/components/memory-viewer";
@@ -18,6 +19,7 @@ interface AgentState {
   id: string;
   name: string;
   occupation: string;
+  gender?: string;
   x: number;
   y: number;
   activity: string;
@@ -32,6 +34,8 @@ interface AgentState {
   money?: number;
   inventory?: Record<string, number>;
   portraitUrl?: string;
+  appearance?: { description?: string; hairColor?: string; skinTone?: string; distinguishingFeatures?: string[] };
+  language?: string;
   dailyPlan?: { morningThought: string; steps: { time: string; description: string }[]; currentStepIdx: number };
 }
 
@@ -53,6 +57,7 @@ interface WorldState {
   weatherIntensity: number;
   agents: AgentState[];
   events: WorldEvent[];
+  eraPack?: any;
 }
 
 function formatGameTime(tick: number): string {
@@ -62,6 +67,11 @@ function formatGameTime(tick: number): string {
   const minute = totalMinutes % 60;
   return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 }
+
+const ITEM_NAMES: Record<string, string> = {
+  bread: "面包", meat: "肉", ale: "麦酒", cloth: "布料",
+  tool: "工具", wood: "木材", iron: "铁", potion: "药剂",
+};
 
 function getSeason(tick: number): string {
   const ticksPerDay = 144;
@@ -114,6 +124,7 @@ export default function Home() {
               id: a.id,
               name: a.identity.name,
               occupation: a.identity.occupation,
+              gender: a.identity.gender,
               x: a.state.position.x,
               y: a.state.position.y,
               activity: a.state.currentActivity,
@@ -127,10 +138,13 @@ export default function Home() {
               dir: a.state.position.dir,
               money: a.state.money,
               inventory: a.state.inventory,
+              language: a.identity.language,
               dailyPlan: a.dailyPlan,
               portraitUrl: a.identity.portraitUrl,
+              appearance: a.identity.appearance,
             })),
             events: [],
+            eraPack: message.world.eraPack,
           });
         }
       } catch (e) {
@@ -312,19 +326,27 @@ export default function Home() {
           {/* Agent detail */}
           {selectedAgent ? (
             <div className="p-4 border rounded-lg bg-background">
-              {selectedAgent.portraitUrl && (
-                <div className="flex justify-center mb-3">
-                  <img
-                    src={selectedAgent.portraitUrl}
-                    alt={selectedAgent.name}
-                    className="w-24 h-24 rounded-lg border-2 border-border object-cover"
-                    style={{ imageRendering: "pixelated" }}
-                  />
-                </div>
-              )}
+              <div className="flex justify-center mb-3">
+                <AgentPortrait
+                  agentId={selectedAgent.id}
+                  name={selectedAgent.name}
+                  occupation={selectedAgent.occupation}
+                  gender={selectedAgent.gender}
+                  eraName={worldState?.eraPack?.name}
+                  appearance={selectedAgent.appearance}
+                  eraPack={worldState?.eraPack}
+                  portraitUrl={selectedAgent.portraitUrl}
+                  size={96}
+                />
+              </div>
               <h3 className="font-bold flex items-center gap-2 mb-3">
                 <Activity className="w-4 h-4" />
                 {selectedAgent.name}
+                {selectedAgent.language && (
+                  <span className="text-xs font-normal px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">
+                    {selectedAgent.language}
+                  </span>
+                )}
               </h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -376,7 +398,7 @@ export default function Home() {
                     {Object.entries(selectedAgent.inventory).map(([itemId, qty]) => (
                       qty > 0 ? (
                         <span key={itemId} className="px-1.5 py-0.5 bg-muted rounded text-muted-foreground">
-                          {itemId}×{qty}
+                          {ITEM_NAMES[itemId] ?? itemId}×{qty}
                         </span>
                       ) : null
                     ))}

@@ -23,41 +23,57 @@ occupations:
     workplace: farm
     description: 耕种土地，种植小麦、大麦等作物
     initialSkills: { farming: 25, animal_handling: 20 }
+    dailyProduces: { bread: 4 }
+    dailyNeeds: { bread: 1, ale: 1 }
   - id: blacksmith
     name: 铁匠
     workplace: smithy
     description: 锻造农具、马蹄铁和简单的金属制品
     initialSkills: { smithing: 30, bargaining: 10, reading: 5 }
+    dailyProduces: { tool: 2 }
+    dailyNeeds: { bread: 1, meat: 1 }
   - id: innkeeper
     name: 酒馆老板
     workplace: tavern
     description: 经营酒馆，为旅人提供食宿和酒水
     initialSkills: { hospitality: 25, bargaining: 15 }
+    dailyProduces: { ale: 4 }
+    dailyNeeds: { bread: 1 }
   - id: merchant
     name: 商人
     workplace: market
     description: 买卖商品，可能是布料、香料或日用品
     initialSkills: { bargaining: 30, reading: 15 }
+    dailyProduces: { cloth: 3 }
+    dailyNeeds: { bread: 1, ale: 1 }
   - id: priest
     name: 牧师
     workplace: church
     description: 主持礼拜，为社区居民提供精神指导
     initialSkills: { reading: 35, oration: 25 }
+    dailyProduces: {}
+    dailyNeeds: { bread: 1 }
   - id: weaver
     name: 织工
     workplace: cottage
     description: 在家织布，制作衣物和布料
     initialSkills: { weaving: 30 }
+    dailyProduces: { cloth: 3 }
+    dailyNeeds: { bread: 1 }
   - id: carpenter
     name: 木匠
     workplace: workshop
     description: 制作家具、房屋结构和其他木制品
     initialSkills: { carpentry: 30, smithing: 5 }
+    dailyProduces: { wood: 3, tool: 1 }
+    dailyNeeds: { bread: 1, ale: 1 }
   - id: baker
     name: 面包师
     workplace: bakery
     description: 烤制面包和糕点
     initialSkills: { baking: 30, bargaining: 5 }
+    dailyProduces: { bread: 5 }
+    dailyNeeds: { bread: 1 }
 
 buildingTypes:
   - id: cottage
@@ -104,6 +120,10 @@ clothingPalette:
     - "运动鞋"
     - "合成纤维"
 
+languages:
+  - English
+  - French
+
 dialogueStyle: |
   使用18世纪的英式英语风格：
   - 使用 "thee", "thou", "thy" 等古英语词汇（可选）
@@ -131,10 +151,19 @@ forbiddenConcepts:
   - 目标
   - 模式
   - 概念
+  - 积极
+  - 消极
+  - 心理
+  - 数据
+  - 项目
+  - 用户
+  - App
+  - 应用
   - 手机
   - 电视
   - 电脑
   - 网络
+  - 汽油
 
 illnesses:
   - { name: 风寒, severityRange: [0.2, 0.5] }

@@ -8,12 +8,16 @@ import {
 } from "@/lib/sprite-generator";
 import { loadConfig } from "@/lib/config/store";
 
+import type { EraPack } from "@/lib/types";
+
 interface AgentPortraitProps {
   agentId: string;
   name: string;
   occupation: string;
   gender?: string;
   eraName?: string;
+  appearance?: { description?: string; hairColor?: string; skinTone?: string; distinguishingFeatures?: string[] };
+  eraPack?: EraPack | null;
   size?: number;
   className?: string;
   portraitUrl?: string | null;
@@ -25,6 +29,8 @@ export function AgentPortrait({
   occupation,
   gender = "male",
   eraName,
+  appearance,
+  eraPack,
   size = 64,
   className = "",
   portraitUrl: propPortraitUrl,
@@ -61,7 +67,7 @@ export function AgentPortrait({
     }
 
     setLoading(true);
-    generatePortrait(name, occupation, gender, config.falApiKey, eraName)
+    generatePortrait(name, occupation, gender, config.falApiKey, eraName, appearance, eraPack)
       .then((url) => {
         if (url) {
           sessionStorage.setItem(`fal-portrait-${agentId}`, url);

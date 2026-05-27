@@ -25,30 +25,44 @@ occupations:
     name: 下级武士
     workplace: samurai_quarter
     description: 领主的家臣，负责治安和行政
+    dailyProduces: {}
+    dailyNeeds: { bread: 1, ale: 1 }
   - id: merchant
     name: 町人商人
     workplace: shop
     description: 经营绸缎、茶叶或干货
+    dailyProduces: { cloth: 2 }
+    dailyNeeds: { bread: 1, ale: 1 }
   - id: innkeeper
     name: 旅笼屋主人
     workplace: inn
     description: 为旅人提供住宿和餐食
+    dailyProduces: { ale: 3 }
+    dailyNeeds: { bread: 1 }
   - id: artisan
     name: 职人
     workplace: workshop
     description: 制作木屐、雨伞、陶瓷等
+    dailyProduces: { tool: 1, wood: 2 }
+    dailyNeeds: { bread: 1 }
   - id: priest
     name: 僧侣
     workplace: temple
     description: 在寺庙修行，为信众诵经
+    dailyProduces: {}
+    dailyNeeds: { bread: 1 }
   - id: entertainer
     name: 芸者
     workplace: teahouse
     description: 在茶屋表演三味线和舞蹈
+    dailyProduces: {}
+    dailyNeeds: { bread: 1, ale: 1 }
   - id: farmer
     name: 农民
     workplace: field
     description: 在城外种植水稻和蔬菜
+    dailyProduces: { bread: 3 }
+    dailyNeeds: { bread: 1, ale: 1 }
 
 buildingTypes:
   - id: machiya
@@ -90,6 +104,10 @@ clothingPalette:
     - "洋装"
     - "现代发型"
 
+languages:
+  - 日本語
+  - 上方語
+
 dialogueStyle: |
   使用江户时代的日语风格：
   - 使用敬语：ござる、でござる、候
@@ -116,6 +134,14 @@ forbiddenConcepts:
   - 目标
   - 模式
   - 概念
+  - 积极
+  - 消极
+  - 心理
+  - 数据
+  - 项目
+  - 用户
+  - App
+  - 应用
   - 手机
   - 电视
   - 电脑
@@ -125,6 +151,8 @@ forbiddenConcepts:
   - 蒸汽船
   - 鎖国
   - キリスト教
+  - 西洋
+  - ロケット
 
 illnesses:
   - { name: 風邪, severityRange: [0.2, 0.5] }

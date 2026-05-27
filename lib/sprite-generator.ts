@@ -259,6 +259,132 @@ export function generateWalkSheet(config: AgentSpriteConfig): string {
   return canvas.toDataURL("image/png");
 }
 
+// Generate a 4-direction walk animation spritesheet (64x96)
+// 4 directions × 4 frames, each frame 16×24
+// Row order: down, left, right, up
+export function generateDirectionWalkSheet(config: AgentSpriteConfig): string {
+  const frameCount = 4;
+  const dirCount = 4;
+  const canvas = document.createElement("canvas");
+  canvas.width = 16 * frameCount;
+  canvas.height = 24 * dirCount;
+  const ctx = canvas.getContext("2d")!;
+  const colors = generateColorsFromSeed(config.seed);
+  const isFemale = config.gender === "female";
+
+  for (let d = 0; d < dirCount; d++) {
+    for (let i = 0; i < frameCount; i++) {
+      const ox = i * 16;
+      const oy = d * 24;
+      const legOffset = [0, 2, 0, -2][i];
+      const armSway = [0, 1, 0, -1][i];
+
+      if (d === 0) {
+        // ── Down (front view) ──
+        // Legs
+        ctx.fillStyle = colors.pants;
+        ctx.fillRect(ox + 5 + legOffset, oy + 16, 2, 8);
+        ctx.fillRect(ox + 9 - legOffset, oy + 16, 2, 8);
+        // Body
+        ctx.fillStyle = colors.clothes;
+        ctx.fillRect(ox + 4, oy + 10, 8, 8);
+        // Arms
+        ctx.fillStyle = colors.skin;
+        ctx.fillRect(ox + 2 + armSway, oy + 11, 2, 5);
+        ctx.fillRect(ox + 12 - armSway, oy + 11, 2, 5);
+        // Head
+        ctx.fillStyle = colors.skin;
+        ctx.fillRect(ox + 5, oy + 4, 6, 6);
+        // Hair
+        ctx.fillStyle = colors.hair;
+        if (isFemale) {
+          ctx.fillRect(ox + 4, oy + 2, 8, 3);
+          ctx.fillRect(ox + 3, oy + 3, 2, 6);
+          ctx.fillRect(ox + 11, oy + 3, 2, 6);
+        } else {
+          ctx.fillRect(ox + 4, oy + 2, 8, 3);
+          ctx.fillRect(ox + 4, oy + 3, 1, 3);
+          ctx.fillRect(ox + 11, oy + 3, 1, 3);
+        }
+        // Eyes
+        ctx.fillStyle = "#000";
+        ctx.fillRect(ox + 6, oy + 6, 1, 1);
+        ctx.fillRect(ox + 9, oy + 6, 1, 1);
+      } else if (d === 1) {
+        // ── Left (side view) ──
+        // Legs
+        ctx.fillStyle = colors.pants;
+        ctx.fillRect(ox + 6, oy + 16 + legOffset, 2, 8);
+        ctx.fillRect(ox + 8, oy + 16 - legOffset, 2, 8);
+        // Body
+        ctx.fillStyle = colors.clothes;
+        ctx.fillRect(ox + 5, oy + 10, 6, 8);
+        // Arms (one visible arm forward)
+        ctx.fillStyle = colors.skin;
+        ctx.fillRect(ox + 3 + armSway, oy + 11, 2, 4);
+        ctx.fillRect(ox + 11 - armSway, oy + 11, 2, 4);
+        // Head
+        ctx.fillStyle = colors.skin;
+        ctx.fillRect(ox + 6, oy + 4, 4, 6);
+        // Hair
+        ctx.fillStyle = colors.hair;
+        ctx.fillRect(ox + 5, oy + 2, 6, 3);
+        ctx.fillRect(ox + 5, oy + 3, 1, 5);
+        if (isFemale) ctx.fillRect(ox + 10, oy + 3, 1, 5);
+        // Single eye
+        ctx.fillStyle = "#000";
+        ctx.fillRect(ox + 7, oy + 6, 1, 1);
+      } else if (d === 2) {
+        // ── Right (mirror of left) ──
+        // Legs (swapped offset)
+        ctx.fillStyle = colors.pants;
+        ctx.fillRect(ox + 6 - legOffset, oy + 16, 2, 8);
+        ctx.fillRect(ox + 8 + legOffset, oy + 16, 2, 8);
+        // Body
+        ctx.fillStyle = colors.clothes;
+        ctx.fillRect(ox + 5, oy + 10, 6, 8);
+        // Arms (swapped sway)
+        ctx.fillStyle = colors.skin;
+        ctx.fillRect(ox + 3 - armSway, oy + 11, 2, 4);
+        ctx.fillRect(ox + 11 + armSway, oy + 11, 2, 4);
+        // Head
+        ctx.fillStyle = colors.skin;
+        ctx.fillRect(ox + 6, oy + 4, 4, 6);
+        // Hair
+        ctx.fillStyle = colors.hair;
+        ctx.fillRect(ox + 5, oy + 2, 6, 3);
+        ctx.fillRect(ox + 10, oy + 3, 1, 5);
+        if (isFemale) ctx.fillRect(ox + 5, oy + 3, 1, 5);
+        // Single eye
+        ctx.fillStyle = "#000";
+        ctx.fillRect(ox + 8, oy + 6, 1, 1);
+      } else {
+        // ── Up (back view) ──
+        // Legs
+        ctx.fillStyle = colors.pants;
+        ctx.fillRect(ox + 5 + legOffset, oy + 16, 2, 8);
+        ctx.fillRect(ox + 9 - legOffset, oy + 16, 2, 8);
+        // Body
+        ctx.fillStyle = colors.clothes;
+        ctx.fillRect(ox + 4, oy + 10, 8, 8);
+        // Arms
+        ctx.fillStyle = colors.skin;
+        ctx.fillRect(ox + 2 + armSway, oy + 11, 2, 5);
+        ctx.fillRect(ox + 12 - armSway, oy + 11, 2, 5);
+        // Head (back = all hair, no face)
+        ctx.fillStyle = colors.hair;
+        ctx.fillRect(ox + 4, oy + 2, 8, 8);
+        if (isFemale) {
+          ctx.fillRect(ox + 3, oy + 3, 2, 6);
+          ctx.fillRect(ox + 11, oy + 3, 2, 6);
+        }
+      }
+    }
+  }
+
+  return canvas.toDataURL("image/png");
+}
+
 // Cache for generated sprites
 const spriteCache = new Map<string, string>();
 

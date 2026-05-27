@@ -240,6 +240,13 @@ Respond with JSON:
       prompt += `\n\n${context.eraPack.worldPrompt}\n\n【对话风格约束】\n${context.eraPack.dialogueStyle}\n\n【绝对禁止提及】\n${context.eraPack.forbiddenConcepts.join("、")}`;
     }
 
+    // H3: Language barrier check
+    const speakerLang = context.speaker.identity.language;
+    const listenerLang = context.listener.identity.language;
+    if (speakerLang && listenerLang && speakerLang !== listenerLang) {
+      prompt += `\n\n【语言障碍】${context.speaker.identity.name} speaks ${speakerLang} but ${context.listener.identity.name} speaks ${listenerLang}. Communication is difficult — use simple words, gestures, or attempt the other's language.`;
+    }
+
     prompt += "\n\nRespond naturally and concisely. Use your character's voice and perspective.";
 
     return prompt;

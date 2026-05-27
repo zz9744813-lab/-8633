@@ -31,6 +31,7 @@ export type AgentIdentity = {
   childIds?: string[];
   spouseId?: string;
   portraitUrl?: string;
+  language?: string;
 };
 
 export type AgentState = {
@@ -133,7 +134,7 @@ export type EraPack = {
   yearStart: number;
   calendar: string;
   worldPrompt: string;
-  occupations: { id: string; name: string; workplace: string }[];
+  occupations: { id: string; name: string; workplace: string; dailyProduces?: Record<string, number>; dailyNeeds?: Record<string, number> }[];
   buildingTypes: { id: string; name: string; visual: string }[];
   clothingPalette: {
     male: string[];
@@ -141,6 +142,7 @@ export type EraPack = {
     forbidden: string[];
   };
   dialogueStyle: string;
+  languages: string[];
   forbiddenConcepts: string[];
 };
 

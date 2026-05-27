@@ -24,34 +24,50 @@ occupations:
     name: 农夫
     workplace: field
     description: 耕种水稻、桑麻
+    dailyProduces: { bread: 3 }
+    dailyNeeds: { bread: 1, ale: 1 }
   - id: scholar
     name: 书生
     workplace: academy
     description: 读书备考，准备科举
+    dailyProduces: {}
+    dailyNeeds: { bread: 1 }
   - id: merchant
     name: 商人
     workplace: shop
     description: 经营店铺，买卖货物
+    dailyProduces: { cloth: 2 }
+    dailyNeeds: { bread: 1, meat: 1 }
   - id: innkeeper
     name: 茶肆老板
     workplace: teahouse
     description: 经营茶肆，招待南来北往的客人
+    dailyProduces: { ale: 3 }
+    dailyNeeds: { bread: 1 }
   - id: craftsman
     name: 工匠
     workplace: workshop
     description: 制作瓷器、丝绸、竹器等
+    dailyProduces: { tool: 1, cloth: 2 }
+    dailyNeeds: { bread: 1 }
   - id: physician
     name: 郎中
     workplace: clinic
     description: 行医问诊，采药制药
+    dailyProduces: { potion: 1 }
+    dailyNeeds: { bread: 1 }
   - id: monk
     name: 僧人
     workplace: temple
     description: 在寺庙修行，诵经礼佛
+    dailyProduces: {}
+    dailyNeeds: { bread: 1 }
   - id: fisherman
     name: 渔夫
     workplace: river
     description: 捕鱼捞虾，撑船摆渡
+    dailyProduces: { meat: 2 }
+    dailyNeeds: { bread: 1, ale: 1 }
 
 buildingTypes:
   - id: courtyard
@@ -95,6 +111,10 @@ clothingPalette:
     - "旗袍"
     - "现代服饰"
 
+languages:
+  - 文言
+  - 官话
+
 dialogueStyle: |
   使用古典中文风格：
   - 语气文雅，多用成语典故
@@ -120,15 +140,26 @@ forbiddenConcepts:
   - 目标
   - 模式
   - 概念
+  - 积极
+  - 消极
+  - 心理
+  - 数据
+  - 项目
+  - 用户
+  - App
+  - 应用
   - 手机
   - 电视
   - 电脑
   - 网络
+  - 汽油
   - 坦克
   - 导弹
   - 机关枪
   - 蒙古
   - 变法
+  - 现代
+  - 二十一世纪
 
 illnesses:
   - { name: 风寒, severityRange: [0.2, 0.5] }

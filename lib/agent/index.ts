@@ -19,6 +19,8 @@ export function createWorld(
   return currentWorld;
 }
 
+import { usageTracker } from "@/lib/llm/usage-tracker";
+
 export async function createWorldOrLoad(
   id: string,
   name: string,
@@ -26,6 +28,8 @@ export async function createWorldOrLoad(
   height: number = 600,
   eraPack: EraPack | null = null
 ): Promise<World> {
+  await usageTracker.initialize();
+
   // If already in registry and loaded, just switch
   if (worldRegistry.has(id)) {
     currentWorld = worldRegistry.get(id)!;

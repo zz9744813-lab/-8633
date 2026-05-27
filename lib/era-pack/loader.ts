@@ -17,6 +17,8 @@ const EraPackSchema = z.object({
     workplace: z.string(),
     description: z.string(),
     initialSkills: z.record(z.number()).default({}),
+    dailyProduces: z.record(z.number()).default({}),
+    dailyNeeds: z.record(z.number()).default({}),
   })),
   buildingTypes: z.array(z.object({
     id: z.string(),
@@ -30,6 +32,7 @@ const EraPackSchema = z.object({
     forbidden: z.array(z.string()),
   }),
   dialogueStyle: z.string(),
+  languages: z.array(z.string()),
   forbiddenConcepts: z.array(z.string()),
   startingConditions: z.object({
     population: z.number(),

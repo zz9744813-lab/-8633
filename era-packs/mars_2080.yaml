@@ -21,26 +21,38 @@ occupations:
     name: 生命支持系统工程师
     workplace: control_center
     description: 维护氧气循环、水循环和温度调节系统
+    dailyProduces: { tool: 1 }
+    dailyNeeds: { bread: 1 }
   - id: botanist
     name: 水培农场技术员
     workplace: greenhouse
     description: 在人工光照下种植土豆、生菜和番茄
+    dailyProduces: { bread: 4 }
+    dailyNeeds: { bread: 1 }
   - id: geologist
     name: 行星地质学家
     workplace: lab
     description: 分析火星岩石样本，寻找水冰资源
+    dailyProduces: {}
+    dailyNeeds: { bread: 1 }
   - id: medic
     name: 太空医生
     workplace: medical
     description: 处理低重力环境下的健康问题
+    dailyProduces: { potion: 1 }
+    dailyNeeds: { bread: 1 }
   - id: pilot
     name: 火星车驾驶员
     workplace: garage
     description: 驾驶勘探车探索火星表面
+    dailyProduces: {}
+    dailyNeeds: { bread: 1 }
   - id: teacher
     name: 殖民地教师
     workplace: school
     description: 教育在火星出生的第一代孩子
+    dailyProduces: {}
+    dailyNeeds: { bread: 1 }
 
 buildingTypes:
   - id: dome
@@ -80,6 +92,11 @@ clothingPalette:
     - "敞开式鞋子"
     - "没有辐射防护的衣物"
 
+languages:
+  - English
+  - 中文
+  - Русский
+
 dialogueStyle: |
   使用科幻风格的专业术语：
   - 提及氧气水平、辐射、系统状态
@@ -105,6 +122,14 @@ forbiddenConcepts:
   - 目标
   - 模式
   - 概念
+  - 积极
+  - 消极
+  - 心理
+  - 数据
+  - 项目
+  - 用户
+  - App
+  - 应用
   - 手机
   - 电视
   - 马
@@ -112,6 +137,10 @@ forbiddenConcepts:
   - 羊
   - 封建社会
   - 皇帝
+  - 中世纪
+  - 马车
+  - 羽毛笔
+  - 蒸汽
 
 illnesses:
   - { name: 辐射病, severityRange: [0.5, 0.9] }

@@ -151,6 +151,23 @@ export class World {
           }
         }
 
+        // G4: Daily consumption — deduct dailyNeeds from inventory
+        const occ = agent.eraPack?.occupations.find(o => o.name === agent.identity.occupation || o.id === agent.identity.occupation);
+        if (occ?.dailyNeeds) {
+          agent.state.inventory = agent.state.inventory ?? {};
+          for (const [itemId, neededQty] of Object.entries(occ.dailyNeeds)) {
+            if (neededQty <= 0) continue;
+            const have = agent.state.inventory[itemId] ?? 0;
+            if (have >= neededQty) {
+              agent.state.inventory[itemId] = have - neededQty;
+            } else {
+              const shortage = neededQty - have;
+              agent.state.inventory[itemId] = 0;
+              agent.state.health = Math.max(0, agent.state.health - shortage * 0.02);
+            }
+          }
+        }
+
         // G2: Age increment (once per year on day 0)
         const daysPassed = Math.floor(this.tickCount / 144);
         const prevDays = Math.floor((this.tickCount - 1) / 144);
@@ -717,6 +734,7 @@ export class World {
         dailyPlan: agent.dailyPlan,
       })),
       buildings: this.buildings,
+      eraPack: this.eraPack,
     };
   }
 }

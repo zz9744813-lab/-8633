@@ -484,6 +484,18 @@ What do you want to do next?`;
             this.state.skills[primarySkill] = Math.min(100, current + gain);
           }
         }
+        // G4: Produce items from work
+        if (this.eraPack) {
+          const occ = this.eraPack.occupations.find(o => o.name === this.identity.occupation || o.id === this.identity.occupation);
+          if (occ?.dailyProduces) {
+            for (const [itemId, qty] of Object.entries(occ.dailyProduces)) {
+              if (qty > 0) {
+                this.state.inventory = this.state.inventory ?? {};
+                this.state.inventory[itemId] = (this.state.inventory[itemId] ?? 0) + qty;
+              }
+            }
+          }
+        }
         return true;
       }
       case "EAT": {

@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
             distinguishingFeatures: [],
           },
           initialGoals: ["谋生", "社交"],
+          language: eraPack.languages?.[Math.floor(Math.random() * (eraPack.languages?.length ?? 1))] ?? eraPack.languages?.[0],
         }, position);
 
         result = {

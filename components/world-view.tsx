@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import * as PIXI from "pixi.js";
 import { Viewport } from "pixi-viewport";
 import {
-  generateWalkSheet,
+  generateDirectionWalkSheet,
   generateBuildingSprite,
   getCachedSprite,
 } from "@/lib/sprite-generator";
@@ -216,17 +216,14 @@ export function WorldView({
             const entry = sprites.get(ad.id);
             if (!entry) continue;
             const isMoving = ad.isMoving || entry.targetMoving;
+            const dirIdx = { down: 0, left: 1, right: 2, up: 3 }[ad.dir ?? "down"] ?? 0;
             if (!isMoving) {
-              entry.sprite.texture = entry.frames[0];
+              entry.sprite.texture = entry.frames[dirIdx * 4];
             } else {
               const currentIdx = entry.frames.indexOf(entry.sprite.texture);
-              const nextIdx = (currentIdx + 1) % entry.frames.length;
+              const rowStart = dirIdx * 4;
+              const nextIdx = rowStart + ((currentIdx - rowStart + 1) % 4);
               entry.sprite.texture = entry.frames[nextIdx];
-            }
-            if (ad.dir === "left") {
-              entry.sprite.scale.x = -Math.abs(entry.sprite.scale.x);
-            } else {
-              entry.sprite.scale.x = Math.abs(entry.sprite.scale.x);
             }
           }
         }
@@ -390,12 +387,14 @@ export function WorldView({
     agents.forEach((agent) => {
       let entry = sprites.get(agent.id);
       if (!entry) {
-        const sheetUrl = getCachedSprite(`walk-${agent.id}`, () => generateWalkSheet({ name: agent.name, occupation: agent.occupation, seed: agent.name.split("").reduce((a, b) => a + b.charCodeAt(0), 0) }));
+        const sheetUrl = getCachedSprite(`walk-${agent.id}`, () => generateDirectionWalkSheet({ name: agent.name, occupation: agent.occupation, seed: agent.name.split("").reduce((a, b) => a + b.charCodeAt(0), 0) }));
         const sheetTexture = PIXI.Texture.from(sheetUrl);
         const frames: PIXI.Texture[] = [];
-        for (let i = 0; i < 4; i++) {
-          const rect = new PIXI.Rectangle(i * 16, 0, 16, 24);
-          frames.push(new PIXI.Texture({ source: sheetTexture.source, frame: rect }));
+        for (let row = 0; row < 4; row++) {
+          for (let col = 0; col < 4; col++) {
+            const rect = new PIXI.Rectangle(col * 16, row * 24, 16, 24);
+            frames.push(new PIXI.Texture({ source: sheetTexture.source, frame: rect }));
+          }
         }
         const agentSprite = new PIXI.Sprite(frames[0]);
         agentSprite.anchor.set(0.5, 1);

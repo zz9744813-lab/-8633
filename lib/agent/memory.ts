@@ -7,7 +7,7 @@ import {
   memoryRepo,
 } from "@/db/memory-repository";
 import { vectorMemoryStore, VectorMemory } from "@/db/vector-memory";
-import { getLLMClient } from "@/lib/llm/client";
+import { getLLMClient, getLLMClientFor } from "@/lib/llm/client";
 import { z } from "zod";
 import { lintContent } from "@/lib/safety/lint";
 
@@ -177,7 +177,7 @@ export class ReflectionEngine {
 
     // Use LLM to generate reflection
     try {
-      const llm = getLLMClient();
+      const llm = getLLMClientFor("reflect");
 
       const memorySummary = recentMemories
         .slice(0, 15)

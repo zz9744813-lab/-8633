@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as PIXI from "pixi.js";
+import { Viewport } from "pixi-viewport";
 import {
   generateWalkSheet,
   generateBuildingSprite,
@@ -160,27 +161,38 @@ export function WorldView({
       containerRef.current!.appendChild(app.canvas);
       appRef.current = app;
 
+      // I4: Create viewport for camera pan/zoom
+      const viewport = new Viewport({
+        screenWidth: width,
+        screenHeight: height,
+        worldWidth: width,
+        worldHeight: height,
+        events: app.renderer.events,
+      });
+      app.stage.addChild(viewport);
+      viewport.drag().pinch().wheel().decelerate().clamp({ direction: "all" }).clampZoom({ minScale: 0.5, maxScale: 4 });
+
       const ground = new PIXI.Graphics();
       groundRef.current = ground;
-      app.stage.addChild(ground);
+      viewport.addChild(ground);
 
       const buildingsContainer = new PIXI.Container();
       buildingsContainerRef.current = buildingsContainer;
-      app.stage.addChild(buildingsContainer);
+      viewport.addChild(buildingsContainer);
 
       const agentsContainer = new PIXI.Container();
       agentsContainerRef.current = agentsContainer;
-      app.stage.addChild(agentsContainer);
+      viewport.addChild(agentsContainer);
 
       const weatherContainer = new PIXI.Container();
       weatherContainerRef.current = weatherContainer;
       weatherContainer.eventMode = "none";
-      app.stage.addChild(weatherContainer);
+      viewport.addChild(weatherContainer);
 
       const overlay = new PIXI.Graphics();
       overlayRef.current = overlay;
       overlay.eventMode = "none";
-      app.stage.addChild(overlay);
+      viewport.addChild(overlay);
 
       updateVisuals();
 

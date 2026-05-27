@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const llm = getLLMClient();
+        const llm = getLLMClient("dialogue");
 
         const systemPrompt = `You are ${speaker.identity.name}, a ${speaker.identity.age}-year-old ${speaker.identity.occupation}.
 Personality: ${speaker.identity.personality.traits.join(", ")}

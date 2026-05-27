@@ -3,9 +3,10 @@ import { World } from "@/lib/agent/world";
 import { Agent } from "@/lib/agent/agent";
 import { memoryManager } from "./memory";
 import { worldEventSystem } from "@/db/world-event-repository";
-import { getLLMClient } from "@/lib/llm/client";
+import { getLLMClient, getLLMClientFor } from "@/lib/llm/client";
 import { z } from "zod";
 import { lintArray } from "@/lib/safety/lint";
+import { lintEraOutput, buildRetrySuffix } from "@/lib/era-pack/lint";
 
 // Season mapping from tick
 function getSeasonFromTick(tick: number): string {
@@ -310,7 +311,7 @@ ${eventsText}
 请输出 3-6 条纪事，每条独立成段，30-80 字。`;
 
     try {
-      const llm = getLLMClient();
+      const llm = getLLMClientFor("chronicle");
 
       const DailySummarySchema = z.object({
         entries: z
@@ -320,19 +321,25 @@ ${eventsText}
           .describe("3-6 条纪事，每条 30-80 字"),
       });
 
-      const result = await llm.generateObject(prompt, DailySummarySchema, systemPrompt);
+      let result = await llm.generateObject(prompt, DailySummarySchema, systemPrompt);
 
-      // H1: Lint chronicle entries
-      const safeEntries = lintArray(result.entries, {
-        onReject: (item, reason) => console.warn(`[H1] Chronicle entry rejected: ${reason}\n  "${item.substring(0, 50)}..."`),
-      });
-      if (safeEntries.length === 0) {
-        console.warn("[H1] All chronicle entries rejected, skipping daily summary");
-        return;
+      // H1: Lint chronicle entries with era pack forbidden concepts
+      if (world.eraPack) {
+        const fullText = result.entries.join(" ");
+        const lint = lintEraOutput(fullText, world.eraPack);
+        if (!lint.ok) {
+          console.warn(`[Lint] Chronicle entries violate forbidden concepts: ${lint.violations.join(", ")}`);
+          // Retry once
+          result = await llm.generateObject(
+            prompt + buildRetrySuffix(lint.violations),
+            DailySummarySchema,
+            systemPrompt
+          );
+        }
       }
 
       // Combine entries into description
-      const description = safeEntries.join("\n\n");
+      const description = result.entries.join("\n\n");
 
       const { year, season, day } = this.getGameDate(world.tickCount);
 
@@ -348,7 +355,7 @@ ${eventsText}
         importance: 0.6,
         metadata: {
           dayNumber,
-          entryCount: safeEntries.length,
+          entryCount: result.entries.length,
         },
       });
 

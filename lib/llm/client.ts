@@ -142,27 +142,71 @@ Respond with a valid JSON object. Do not include markdown formatting or code blo
   }
 }
 
-// Global LLM client instance
-let globalClient: LLMClient | null = null;
+// Global LLM client instances
+let currentConfig: LLMConfig | null = null;
+const clients = new Map<string, LLMClient>();
 
-export function initLLM(config: LLMConfig): LLMClient {
-  globalClient = new LLMClientImpl(config);
-  return globalClient;
+export type LLMRole = "plan" | "reflect" | "dialogue" | "score" | "chronicle" | "drama";
+
+const ROLE_MODEL_MAP: Record<LLMRole, string> = {
+  plan: "claude-sonnet-4-5",
+  reflect: "claude-sonnet-4-5",
+  dialogue: "claude-haiku-4-5",
+  score: "claude-haiku-4-5",
+  chronicle: "claude-sonnet-4-5",
+  drama: "claude-sonnet-4-5",
+};
+
+function getModelForRole(role: LLMRole, baseConfig: LLMConfig): string {
+  if (baseConfig.provider === "ollama") return baseConfig.model;
+  return ROLE_MODEL_MAP[role];
 }
 
-export function getLLMClient(): LLMClient {
-  if (!globalClient) {
+let globalClient: LLMClient | null = null;
+const roleClients = new Map<LLMRole, LLMClient>();
+
+export function initLLM(config: LLMConfig): LLMClient {
+  currentConfig = config;
+  clients.clear();
+  roleClients.clear();
+  const client = new LLMClientImpl(config);
+  clients.set("plan", client);
+  globalClient = client;
+  roleClients.set("plan", client);
+  return client;
+}
+
+export function getLLMClient(role: LLMRole = "plan"): LLMClient {
+  if (!currentConfig) {
     throw new Error("LLM client not initialized. Call initLLM first.");
   }
-  return globalClient;
+  const key = `${role}-${currentConfig.provider}`;
+  if (!clients.has(key)) {
+    const roleModel = getModelForRole(role, currentConfig);
+    const roleConfig = { ...currentConfig, model: roleModel };
+    clients.set(key, new LLMClientImpl(roleConfig));
+  }
+  return clients.get(key)!;
+}
+
+export function getLLMClientFor(role: LLMRole): LLMClient {
+  if (!roleClients.has(role)) {
+    if (!globalClient) throw new Error("Init globalClient first");
+    const config = (globalClient as any).config as LLMConfig;
+    roleClients.set(role, new LLMClientImpl({
+      ...config,
+      model: ROLE_MODEL_MAP[role],
+    }));
+  }
+  return roleClients.get(role)!;
 }
 
 export function isLLMInitialized(): boolean {
-  return globalClient !== null;
+  return currentConfig !== null;
 }
 
 // Switch to a different model config
 export function switchLLM(config: LLMConfig): LLMClient {
-  globalClient = new LLMClientImpl(config);
-  return globalClient;
+  initLLM(config);
+  return getLLMClient();
 }

@@ -30,6 +30,7 @@ export type AgentIdentity = {
   parentIds?: string[];
   childIds?: string[];
   spouseId?: string;
+  portraitUrl?: string;
 };
 
 export type AgentState = {

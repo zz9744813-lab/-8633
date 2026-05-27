@@ -2,9 +2,10 @@ import { RumorRepository, rumorRepo, RumorType } from "@/db/rumor-repository";
 import { MemoryManager, memoryManager } from "./memory";
 import { Agent } from "./agent";
 import { World } from "./world";
-import { getLLMClient } from "@/lib/llm/client";
+import { getLLMClient, getLLMClientFor } from "@/lib/llm/client";
 import { z } from "zod";
 import { lintContent } from "@/lib/safety/lint";
+import { lintEraOutput } from "@/lib/era-pack/lint";
 
 // Rumor engine for handling rumor creation and spread
 export class RumorEngine {
@@ -29,6 +30,14 @@ export class RumorEngine {
     truthLevel: number = 0.5,
     sourceMemoryId?: string
   ): Promise<string> {
+    // B: Lint rumor content against era pack forbidden concepts
+    if (world.eraPack) {
+      const lint = lintEraOutput(content, world.eraPack);
+      if (!lint.ok) {
+        console.warn(`[Lint] Rumor content violates forbidden concepts: ${lint.violations.join(", ")}`);
+      }
+    }
+
     const rumor = await this.repo.create({
       worldId: world.id,
       originatorId: originator.id,
@@ -127,7 +136,7 @@ export class RumorEngine {
     listener: Agent
   ): Promise<{ content: string; level: number }> {
     try {
-      const llm = getLLMClient();
+      const llm = getLLMClientFor("score");
 
       const systemPrompt = `You are distorting a rumor as it passes from one person to another.
 Modify the rumor slightly to reflect:

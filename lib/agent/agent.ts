@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { AgentIdentity, AgentState, Position, Memory, Action, ActionType } from "@/lib/types";
 import { EraPack } from "@/lib/era-pack/loader";
-import { getLLMClient } from "@/lib/llm/client";
+import { getLLMClient, getLLMClientFor } from "@/lib/llm/client";
 import { memoryManager } from "@/lib/agent/memory";
 import { dialogueSystem } from "@/lib/agent/dialogue";
 import { relationshipManager } from "@/db/relationship-repository";
 import { lintContent, lintArray } from "@/lib/safety/lint";
+import { lintEraOutput, buildRetrySuffix } from "@/lib/era-pack/lint";
 
 // Perception: What an agent observes
 export interface Perception {
@@ -119,7 +120,7 @@ export class Agent {
     weather?: string;
     weatherIntensity?: number;
   }): Promise<DailyPlan> {
-    const llm = getLLMClient();
+    const llm = getLLMClientFor("plan");
 
     // Retrieve relevant memories for planning context
     const relevantMemories = await memoryManager.retrieveRelevant(
@@ -194,35 +195,30 @@ ${relevantMemories.length > 0
     });
 
     try {
-      const response = await llm.generateObject(
+      let response = await llm.generateObject(
         `当前时间：${worldState.currentTime}\n请制定今天的日程计划。`,
         PlanSchema,
         systemPrompt
       );
 
-      // H1: Lint daily plan
-      const thoughtLint = lintContent(response.morningThought);
-      if (!thoughtLint.passed) {
-        console.warn(`[H1] Daily plan morningThought rejected: ${thoughtLint.reason}`);
-        response.morningThought = "又是新的一天。";
-      }
-      const safeSteps = response.steps.filter((step, i) => {
-        const descLint = lintContent(step.description);
-        const reasonLint = lintContent(step.reason);
-        if (!descLint.passed || !reasonLint.passed) {
-          console.warn(`[H1] Daily plan step ${i} rejected: ${descLint.reason || reasonLint.reason}`);
-          return false;
+      // H1: Lint daily plan with era pack forbidden concepts
+      if (this.eraPack) {
+        const planText = response.morningThought + " " + response.steps.map(s => s.description + " " + s.reason).join(" ");
+        const lint = lintEraOutput(planText, this.eraPack);
+        if (!lint.ok) {
+          console.warn(`[Lint] Daily plan violated forbidden concepts: ${lint.violations.join(", ")}`);
+          // Retry once with forbidden concepts appended
+          response = await llm.generateObject(
+            `当前时间：${worldState.currentTime}\n请制定今天的日程计划。${buildRetrySuffix(lint.violations)}`,
+            PlanSchema,
+            systemPrompt
+          );
         }
-        return true;
-      });
-      if (safeSteps.length < 3) {
-        console.warn("[H1] Too few safe daily plan steps, using fallback");
-        throw new Error("Too many rejected steps");
       }
 
       this.dailyPlan = {
         morningThought: response.morningThought,
-        steps: safeSteps,
+        steps: response.steps,
         currentStepIdx: 0,
         plannedAtTick: currentTick,
       };
@@ -330,7 +326,7 @@ ${relevantMemories.length > 0
 
   // Planning phase: Decide what to do with memory retrieval
   async planAction(perception: Perception): Promise<Action> {
-    const llm = getLLMClient();
+    const llm = getLLMClientFor("plan");
 
     // Retrieve relevant memories based on current context
     const contextQuery = `What should I do at ${perception.currentTime} near ${perception.nearbyBuildings.map(b => b.name).join(", ") || "nowhere"}?`;

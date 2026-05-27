@@ -274,43 +274,47 @@ export function clearSpriteCache(): void {
 }
 
 // I1: Generate AI portrait via fal.ai
+import * as fal from "@fal-ai/serverless-client";
+import type { EraPack } from "@/lib/types";
+
+// ... existing code ...
+
 export async function generatePortrait(
   name: string,
   occupation: string,
   gender: string,
   apiKey: string,
-  eraName?: string
+  eraName?: string,
+  appearance?: { description?: string; hairColor?: string; skinTone?: string; distinguishingFeatures?: string[] },
+  eraPack?: EraPack | null
 ): Promise<string | null> {
   if (!apiKey) return null;
 
-  const prompt = `pixel art portrait, head and shoulders, retro game character, 
+  const clothingDesc = eraPack?.clothingPalette?.[gender === "female" ? "female" : "male"]?.join(", ");
+  const clothingPart = clothingDesc ? `wearing ${clothingDesc}, ` : "";
+
+  const prompt = `pixel art portrait, head and shoulders, retro game character style, 
 ${occupation}, ${gender}, named ${name},
-${eraName ? eraName + " era" : "fantasy setting"},
-limited palette, sharp pixels, simple background,
-no text, no logo, game sprite style`;
+${appearance?.description ? appearance.description + ", " : ""}
+${appearance?.hairColor ? appearance.hairColor + " hair, " : ""}
+${appearance?.skinTone ? appearance.skinTone + " skin, " : ""}
+${clothingPart}
+${eraName ? eraName + " era clothing, " : "fantasy setting, "}
+sharp pixels, 8-bit style, limited color palette, simple solid background,
+no text, no logo, game sprite portrait view, highly pixelated`;
 
   try {
-    const response = await fetch("https://fal.run/fal-ai/flux/schnell", {
-      method: "POST",
-      headers: {
-        "Authorization": `Key ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    fal.config({ credentials: apiKey });
+    const result = await fal.subscribe("fal-ai/flux/schnell", {
+      input: {
         prompt,
         image_size: "square_hd",
         num_inference_steps: 4,
         num_images: 1,
-      }),
-    });
-
-    if (!response.ok) {
-      console.warn("[Portrait] fal.ai API error:", response.status);
-      return null;
-    }
-
-    const data = await response.json();
-    return data?.images?.[0]?.url ?? null;
+        enable_safety_checker: false,
+      },
+    }) as any;
+    return result?.images?.[0]?.url ?? result?.output?.images?.[0]?.url ?? null;
   } catch (e) {
     console.warn("[Portrait] fal.ai API failed:", e);
     return null;

@@ -2,7 +2,7 @@ import { MemoryManager, memoryManager } from "./memory";
 import { relationshipManager } from "@/db/relationship-repository";
 import { Agent } from "./agent";
 import { World } from "./world";
-import { getLLMClient } from "@/lib/llm/client";
+import { getLLMClient, getLLMClientFor } from "@/lib/llm/client";
 import { z } from "zod";
 import { chronicleEngine } from "./chronicle-engine";
 import { rumorEngine } from "./rumor-engine";
@@ -317,6 +317,7 @@ export class DramaEngine {
 
   // Execute a drama event
   async executeDrama(world: World, drama: DramaEvent): Promise<void> {
+    getLLMClientFor("drama");
     console.log(`[Drama] ${drama.type}: ${drama.description}`);
 
     // Apply relationship changes

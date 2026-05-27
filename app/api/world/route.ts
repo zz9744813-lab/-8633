@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createWorldOrLoad, getWorld, destroyWorld, setWorld } from "@/lib/agent";
 import { loadEraPack, generateAgentIdentity } from "@/lib/era-pack/loader";
 import { AgentIdentity, Building } from "@/lib/types";
+import { generatePortrait } from "@/lib/sprite-generator";
+import { worldRepository } from "@/db/world-repository";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +94,10 @@ export async function POST(request: NextRequest) {
     // Start the simulation
     world.start();
 
+    // I1: Async portrait generation for all agents (non-blocking)
+    const eraName = eraPack?.id ?? undefined;
+    generatePortraitsForWorld(world, eraName).catch(() => {});
+
     return NextResponse.json({ world: world.toJSON() });
   } catch (error) {
     console.error("Failed to create world:", error);
@@ -127,6 +133,30 @@ export async function GET() {
   }
 
   return NextResponse.json({ world: world.toJSON() });
+}
+
+// I1: Generate portraits for all agents in background
+async function generatePortraitsForWorld(world: ReturnType<typeof getWorld>, eraName?: string) {
+  if (!world) return;
+  const config = await import("@/lib/config/store").then(m => m.loadConfig());
+  const apiKey = config.falApiKey;
+  if (!apiKey) return;
+
+  for (const [id, agent] of world.agents) {
+    if (agent.identity.portraitUrl) continue;
+    const url = await generatePortrait(
+      agent.identity.name,
+      agent.identity.occupation,
+      agent.identity.gender,
+      apiKey,
+      eraName,
+      agent.identity.appearance
+    );
+    if (url) {
+      agent.identity.portraitUrl = url;
+      try { await worldRepository.saveWorld(world); } catch {}
+    }
+  }
 }
 
 // DELETE /api/world - Destroy current world

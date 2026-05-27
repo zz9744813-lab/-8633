@@ -31,6 +31,7 @@ interface AgentState {
   dir?: string;
   money?: number;
   inventory?: Record<string, number>;
+  portraitUrl?: string;
   dailyPlan?: { morningThought: string; steps: { time: string; description: string }[]; currentStepIdx: number };
 }
 
@@ -127,6 +128,7 @@ export default function Home() {
               money: a.state.money,
               inventory: a.state.inventory,
               dailyPlan: a.dailyPlan,
+              portraitUrl: a.identity.portraitUrl,
             })),
             events: [],
           });
@@ -310,6 +312,16 @@ export default function Home() {
           {/* Agent detail */}
           {selectedAgent ? (
             <div className="p-4 border rounded-lg bg-background">
+              {selectedAgent.portraitUrl && (
+                <div className="flex justify-center mb-3">
+                  <img
+                    src={selectedAgent.portraitUrl}
+                    alt={selectedAgent.name}
+                    className="w-24 h-24 rounded-lg border-2 border-border object-cover"
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                </div>
+              )}
               <h3 className="font-bold flex items-center gap-2 mb-3">
                 <Activity className="w-4 h-4" />
                 {selectedAgent.name}

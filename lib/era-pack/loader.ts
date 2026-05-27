@@ -151,3 +151,13 @@ export function validateEraPack(eraPack: EraPack): string[] {
 
   return errors;
 }
+
+export function lintEraOutput(text: string, eraPack: EraPack): {
+  ok: boolean; violations: string[];
+} {
+  const violations: string[] = [];
+  for (const word of eraPack.forbiddenConcepts ?? []) {
+    if (text.includes(word)) violations.push(word);
+  }
+  return { ok: violations.length === 0, violations };
+}

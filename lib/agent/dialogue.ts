@@ -1,4 +1,4 @@
-import { getLLMClient } from "@/lib/llm/client";
+import { getLLMClient, getLLMClientFor } from "@/lib/llm/client";
 import { memoryManager } from "@/lib/agent/memory";
 import { relationshipManager } from "@/db/relationship-repository";
 import { Agent } from "@/lib/agent/agent";
@@ -7,6 +7,7 @@ import { EraPack } from "@/lib/era-pack/loader";
 import { rumorEngine } from "./rumor-engine";
 import { World } from "./world";
 import { lintContent } from "@/lib/safety/lint";
+import { lintEraOutput, buildRetrySuffix } from "@/lib/era-pack/lint";
 
 export interface DialogueContext {
   world: World;
@@ -29,7 +30,7 @@ export interface DialogueResult {
 export class DialogueSystem {
   // Generate a conversation between two agents
   async generateDialogue(context: DialogueContext): Promise<DialogueResult> {
-    const llm = getLLMClient();
+    const llm = getLLMClientFor("dialogue");
 
     // Get relationship info
     const relationship = await relationshipManager.getRelationship(
@@ -77,18 +78,22 @@ Respond with JSON:
 }`;
 
     try {
-      const speakerResponse = await llm.generateJSON<{
+      let speakerResponse = await llm.generateJSON<{
         text: string;
         emotion: "friendly" | "neutral" | "hostile" | "excited" | "sad";
         relationshipImpact: number;
       }>(speakerPrompt, systemPrompt);
 
-      // H1: Lint speaker response
-      const speakerLint = lintContent(speakerResponse.text);
-      if (!speakerLint.passed) {
-        console.warn(`[H1] Dialogue speaker text rejected: ${speakerLint.reason}`);
-        speakerResponse.text = speakerLint.sanitized ?? "今天天气不错。";
-        speakerResponse.relationshipImpact = 0;
+      // B: Lint speaker response with era pack forbidden concepts
+      const eraPack = context.eraPack;
+      if (eraPack) {
+        const lint = lintEraOutput(speakerResponse.text, eraPack);
+        if (!lint.ok) {
+          console.warn(`[Lint] Speaker text violates forbidden concepts: ${lint.violations.join(", ")}`);
+          speakerResponse = await llm.generateJSON<{
+            text: string; emotion: "friendly" | "neutral" | "hostile" | "excited" | "sad"; relationshipImpact: number;
+          }>(speakerPrompt + buildRetrySuffix(lint.violations), systemPrompt);
+        }
       }
 
       // Generate listener response
@@ -114,18 +119,21 @@ Respond with JSON:
   "relationshipImpact": number (-10 to 10)
 }`;
 
-      const listenerResponse = await llm.generateJSON<{
+      let listenerResponse = await llm.generateJSON<{
         text: string;
         emotion: "friendly" | "neutral" | "hostile" | "excited" | "sad";
         relationshipImpact: number;
       }>(listenerPrompt, systemPrompt);
 
-      // H1: Lint listener response
-      const listenerLint = lintContent(listenerResponse.text);
-      if (!listenerLint.passed) {
-        console.warn(`[H1] Dialogue listener text rejected: ${listenerLint.reason}`);
-        listenerResponse.text = listenerLint.sanitized ?? "嗯，原来如此。";
-        listenerResponse.relationshipImpact = 0;
+      // B: Lint listener response
+      if (eraPack) {
+        const lint = lintEraOutput(listenerResponse.text, eraPack);
+        if (!lint.ok) {
+          console.warn(`[Lint] Listener text violates forbidden concepts: ${lint.violations.join(", ")}`);
+          listenerResponse = await llm.generateJSON<{
+            text: string; emotion: "friendly" | "neutral" | "hostile" | "excited" | "sad"; relationshipImpact: number;
+          }>(listenerPrompt + buildRetrySuffix(lint.violations), systemPrompt);
+        }
       }
 
       // Record the conversation in memories
@@ -272,7 +280,7 @@ Respond with JSON:
     situation: string,
     currentTick: number
   ): Promise<string> {
-    const llm = getLLMClient();
+    const llm = getLLMClientFor("dialogue");
 
     // Get recent memories
     const memories = await memoryManager.getSTM(agent.id, currentTick, 5);

@@ -16,6 +16,7 @@ interface AgentPortraitProps {
   eraName?: string;
   size?: number;
   className?: string;
+  portraitUrl?: string | null;
 }
 
 export function AgentPortrait({
@@ -26,6 +27,7 @@ export function AgentPortrait({
   eraName,
   size = 64,
   className = "",
+  portraitUrl: propPortraitUrl,
 }: AgentPortraitProps) {
   const [aiUrl, setAiUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -42,10 +44,16 @@ export function AgentPortrait({
   }, [agentId, name, occupation, gender]);
 
   useEffect(() => {
+    // If portraitUrl already provided (e.g. from SSE/DB), use it directly
+    if (propPortraitUrl) {
+      setAiUrl(propPortraitUrl);
+      return;
+    }
+
     const config = loadConfig();
     if (!config.falApiKey) return;
 
-    // Check cache
+    // Check session cache
     const cached = sessionStorage.getItem(`fal-portrait-${agentId}`);
     if (cached) {
       setAiUrl(cached);
@@ -58,11 +66,17 @@ export function AgentPortrait({
         if (url) {
           sessionStorage.setItem(`fal-portrait-${agentId}`, url);
           setAiUrl(url);
+          // Persist to DB
+          fetch("/api/agents/portrait", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ agentId, portraitUrl: url }),
+          }).catch(() => {});
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [agentId, name, occupation, gender, eraName]);
+  }, [agentId, name, occupation, gender, eraName, propPortraitUrl]);
 
   const portraitUrl = aiUrl || fallbackUrl;
 

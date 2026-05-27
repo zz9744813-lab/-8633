@@ -95,7 +95,7 @@ export class WorldEventSystem {
       return null;
     }
 
-    const llm = getLLMClient();
+    const llm = getLLMClient("score");
 
     // 15% chance for illness event
     if (Math.random() < 0.15) {

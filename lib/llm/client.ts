@@ -57,33 +57,36 @@ class LLMClientImpl implements LLMClient {
   }
 
   async generateText(prompt: string, system?: string): Promise<string> {
-    // Check rate limit
-    const rateLimiter = getRateLimiter();
-    if (rateLimiter) {
-      const status = rateLimiter.canMakeCall();
-      if (!status.allowed) {
-        if (status.waitMs && status.waitMs < 30000) {
-          await new Promise((resolve) => setTimeout(resolve, status.waitMs));
-        } else {
-          throw new Error(status.reason || "Rate limit exceeded");
+    // T5.2: Use concurrency limiter
+    return concurrencyLimiter.run(async () => {
+      // Check rate limit
+      const rateLimiter = getRateLimiter();
+      if (rateLimiter) {
+        const status = rateLimiter.canMakeCall();
+        if (!status.allowed) {
+          if (status.waitMs && status.waitMs < 30000) {
+            await new Promise((resolve) => setTimeout(resolve, status.waitMs));
+          } else {
+            throw new Error(status.reason || "Rate limit exceeded");
+          }
         }
+        rateLimiter.recordCall("generateText");
       }
-      rateLimiter.recordCall("generateText");
-    }
 
-    const result = await generateText({
-      model: this.model,
-      prompt,
-      system,
-      temperature: 0.7,
-      maxTokens: 2000,
+      const result = await generateText({
+        model: this.model,
+        prompt,
+        system,
+        temperature: 0.7,
+        maxTokens: 2000,
+      });
+      // J4: Track usage
+      const usage = (result as any).usage;
+      if (usage) {
+        usageTracker.recordCall(this.config.provider, this.config.model, usage.promptTokens ?? 0, usage.completionTokens ?? 0, "generateText");
+      }
+      return result.text;
     });
-    // J4: Track usage
-    const usage = (result as any).usage;
-    if (usage) {
-      usageTracker.recordCall(this.config.provider, this.config.model, usage.promptTokens ?? 0, usage.completionTokens ?? 0, "generateText");
-    }
-    return result.text;
   }
 
   async generateObject<T extends z.ZodType>(
@@ -91,33 +94,36 @@ class LLMClientImpl implements LLMClient {
     schema: T,
     system?: string
   ): Promise<z.infer<T>> {
-    // Check rate limit
-    const rateLimiter = getRateLimiter();
-    if (rateLimiter) {
-      const status = rateLimiter.canMakeCall();
-      if (!status.allowed) {
-        if (status.waitMs && status.waitMs < 30000) {
-          await new Promise((resolve) => setTimeout(resolve, status.waitMs));
-        } else {
-          throw new Error(status.reason || "Rate limit exceeded");
+    // T5.2: Use concurrency limiter
+    return concurrencyLimiter.run(async () => {
+      // Check rate limit
+      const rateLimiter = getRateLimiter();
+      if (rateLimiter) {
+        const status = rateLimiter.canMakeCall();
+        if (!status.allowed) {
+          if (status.waitMs && status.waitMs < 30000) {
+            await new Promise((resolve) => setTimeout(resolve, status.waitMs));
+          } else {
+            throw new Error(status.reason || "Rate limit exceeded");
+          }
         }
+        rateLimiter.recordCall("generateObject");
       }
-      rateLimiter.recordCall("generateObject");
-    }
 
-    const result = await generateObject({
-      model: this.model,
-      prompt,
-      schema,
-      system,
-      temperature: 0.7,
+      const result = await generateObject({
+        model: this.model,
+        prompt,
+        schema,
+        system,
+        temperature: 0.7,
+      });
+      // J4: Track usage
+      const usage = (result as any).usage;
+      if (usage) {
+        usageTracker.recordCall(this.config.provider, this.config.model, usage.promptTokens ?? 0, usage.completionTokens ?? 0, "generateObject");
+      }
+      return result.object;
     });
-    // J4: Track usage
-    const usage = (result as any).usage;
-    if (usage) {
-      usageTracker.recordCall(this.config.provider, this.config.model, usage.promptTokens ?? 0, usage.completionTokens ?? 0, "generateObject");
-    }
-    return result.object;
   }
 
   // Generate JSON without schema validation (fallback for providers that don't support structured output)
@@ -148,6 +154,55 @@ let currentConfig: LLMConfig | null = null;
 const clients = new Map<string, LLMClient>();
 
 export type LLMRole = "plan" | "reflect" | "dialogue" | "score" | "chronicle" | "drama";
+
+// T5.2: Concurrent LLM call limiter
+class LLMConcurrencyLimiter {
+  private maxConcurrent: number = 3;
+  private currentRunning: number = 0;
+  private queue: Array<{
+    resolve: (value: any) => void;
+    reject: (reason?: any) => void;
+    fn: () => Promise<any>;
+  }> = [];
+
+  constructor(maxConcurrent: number = 3) {
+    this.maxConcurrent = maxConcurrent;
+  }
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.currentRunning < this.maxConcurrent) {
+      return this.execute(fn);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.queue.push({ resolve, reject, fn });
+    });
+  }
+
+  private async execute<T>(fn: () => Promise<T>): Promise<T> {
+    this.currentRunning++;
+    try {
+      const result = await fn();
+      return result;
+    } finally {
+      this.currentRunning--;
+      this.processQueue();
+    }
+  }
+
+  private processQueue(): void {
+    if (this.queue.length === 0 || this.currentRunning >= this.maxConcurrent) {
+      return;
+    }
+    const next = this.queue.shift();
+    if (next) {
+      this.execute(next.fn).then(next.resolve).catch(next.reject);
+    }
+  }
+}
+
+// Global concurrency limiter
+const concurrencyLimiter = new LLMConcurrencyLimiter(3);
 
 // T1.3: Optional role-based model mapping (user can configure in roleModels)
 // If not provided, uses the base model for all roles

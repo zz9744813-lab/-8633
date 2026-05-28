@@ -10,6 +10,17 @@ import { worldEventSystem } from "@/db/world-event-repository";
 import { worldRepository } from "@/db/world-repository";
 import { relationshipManager } from "@/db/relationship-repository";
 
+// T5.1: Batch memory queue for performance
+interface PendingMemory {
+  agentId: string;
+  type: string;
+  content: string;
+  importance: number;
+  tick: number;
+  relatedAgentIds?: string[];
+  locationId?: string;
+}
+
 // World simulation
 export class World {
   id: string;
@@ -34,6 +45,10 @@ export class World {
   private lastTickTime: number = 0;
   private running: boolean = false;
   onTickCallbacks: Array<(world: World) => void> = [];
+
+  // T5.1: Batch memory queue
+  private pendingMemories: PendingMemory[] = [];
+  private lastMemoryFlushTick: number = 0;
 
   constructor(
     id: string,
@@ -106,6 +121,54 @@ export class World {
       currentTime: this.formatGameTime(),
       tick: this.tickCount,
     };
+  }
+
+  // T5.1: Queue memory for batch insert
+  queueMemory(memory: PendingMemory): void {
+    this.pendingMemories.push(memory);
+  }
+
+  // T5.1: Flush pending memories to DB (call at end of tick)
+  private async flushMemories(): Promise<void> {
+    if (this.pendingMemories.length === 0) return;
+
+    const memoriesToFlush = this.pendingMemories.splice(0, this.pendingMemories.length);
+
+    try {
+      // Batch insert using Promise.all for now (drizzle doesn't support true bulk insert with SQLite)
+      // Group by agent to reduce DB round trips
+      const byAgent = new Map<string, typeof memoriesToFlush>();
+      for (const m of memoriesToFlush) {
+        const list = byAgent.get(m.agentId) || [];
+        list.push(m);
+        byAgent.set(m.agentId, list);
+      }
+
+      // Insert per agent in parallel with limited concurrency
+      const entries = Array.from(byAgent.entries());
+      const batchSize = 5; // Limit concurrent inserts
+
+      for (let i = 0; i < entries.length; i += batchSize) {
+        const batch = entries.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async ([agentId, mems]) => {
+            for (const m of mems) {
+              try {
+                await memoryManager.addMemory(m as any);
+              } catch (e) {
+                console.warn(`[World] Failed to add memory for ${agentId}:`, e);
+              }
+            }
+          })
+        );
+      }
+
+      if (memoriesToFlush.length > 10) {
+        console.log(`[World] Flushed ${memoriesToFlush.length} memories`);
+      }
+    } catch (e) {
+      console.error("[World] Failed to flush memories:", e);
+    }
   }
 
   // Main simulation step
@@ -190,7 +253,7 @@ export class World {
             const relations = await agent.getAllRelationships();
             for (const rel of relations) {
               if (rel.affinity > 0.5) {
-                await memoryManager.addMemory({
+                this.queueMemory({
                   agentId: rel.toAgentId,
                   type: "event",
                   content: `${agent.identity.name} 去世了。`,
@@ -253,7 +316,7 @@ export class World {
         if (this.tickCount - lastChildTick < 52560) continue; // ~1 year
         if (Math.random() < 0.05) {
           agent.state.pregnantSince = this.tickCount;
-          await memoryManager.addMemory({
+          this.queueMemory({
             agentId: agent.id, type: "observation",
             content: "你怀孕了。", importance: 0.85, tick: this.tickCount,
           });
@@ -372,7 +435,7 @@ export class World {
 
       // Write observation memories for nearby agents
       for (const nearby of perception.nearbyAgents) {
-        await memoryManager.addMemory({
+        this.queueMemory({
           agentId: agent.id,
           type: "observation",
           content: `看见 ${nearby.name} 在 ${nearby.activity}`,
@@ -453,7 +516,7 @@ export class World {
       }
 
       // Write action memory
-      await memoryManager.addMemory({
+      this.queueMemory({
         agentId: agent.id,
         type: "event",
         content: action.description,
@@ -587,7 +650,7 @@ export class World {
                 estimatedDuration: 144 * (3 + Math.floor(Math.random() * 7)), // 3-10 days
               };
               sickAgent.state.status = "sick";
-              await memoryManager.addMemory({
+              this.queueMemory({
                 agentId: sickId,
                 type: "observation",
                 content: `你感染了${illness.name}。`,
@@ -600,7 +663,7 @@ export class World {
         }
 
         for (const witnessId of event.witnessIds) {
-          await memoryManager.addMemory({
+          this.queueMemory({
             agentId: witnessId,
             type: "observation",
             content: `目击了世界事件：${event.description}`,
@@ -666,6 +729,9 @@ export class World {
         console.error("[World] Save failed:", e);
       }
     }
+
+    // T5.1: Flush all pending memories at end of tick
+    await this.flushMemories();
 
     this.tickCount++;
 

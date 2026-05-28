@@ -8,6 +8,17 @@ interface EmbeddingConfig {
   baseUrl?: string;
 }
 
+// T3.2: Model dimension mapping
+const MODEL_DIMENSIONS: Record<string, number> = {
+  // Ollama models
+  "nomic-embed-text": 768,
+  "all-minilm": 384,
+  // OpenAI models
+  "text-embedding-3-small": 1536,
+  "text-embedding-3-large": 3072,
+  "text-embedding-ada-002": 1536,
+};
+
 let currentEmbeddingConfig: EmbeddingConfig | null = null;
 
 const DEFAULT_CONFIG: EmbeddingConfig = {
@@ -36,6 +47,12 @@ function getConfig(): EmbeddingConfig {
   return { provider, model, apiKey, baseUrl };
 }
 
+// T3.2: Get embedding dimension for current config
+export function getEmbeddingDimension(): number {
+  const config = getConfig();
+  return MODEL_DIMENSIONS[config.model] || 768; // Default to 768
+}
+
 // Generate embedding for a single text
 export async function generateEmbedding(text: string): Promise<number[]> {
   const config = getConfig();
@@ -48,8 +65,8 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     }
   } catch (error) {
     console.error("[Embedding] Failed to generate embedding:", error);
-    // Return zero vector as fallback
-    return new Array(768).fill(0);
+    // T3.2: Return zero vector with correct dimension
+    return new Array(getEmbeddingDimension()).fill(0);
   }
 }
 
@@ -71,8 +88,9 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
     }
   } catch (error) {
     console.error("[Embedding] Failed to generate embeddings:", error);
-    // Return zero vectors as fallback
-    return texts.map(() => new Array(768).fill(0));
+    // T3.2: Return zero vectors with correct dimension
+    const dim = getEmbeddingDimension();
+    return texts.map(() => new Array(dim).fill(0));
   }
 }
 

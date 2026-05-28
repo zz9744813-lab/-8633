@@ -1,7 +1,7 @@
-import { db } from "./index";
+import { db, vectorAvailable } from "./index";
 import { memories, Memory } from "./schema";
 import { eq, sql } from "drizzle-orm";
-import { generateEmbedding, embeddingToSqliteVec } from "@/lib/llm/embeddings";
+import { generateEmbedding, embeddingToSqliteVec, getEmbeddingDimension } from "@/lib/llm/embeddings";
 
 // Vector memory with semantic search using sqlite-vec
 // Note: sqlite-vec creates a virtual table for embeddings
@@ -18,20 +18,50 @@ export interface VectorMemory {
 
 export class VectorMemoryStore {
   private initialized: boolean = false;
+  private currentDimension: number = 768;
 
   // Initialize vector table (call once on startup)
   async initialize(): Promise<boolean> {
+    // T3.1: Check if vector extension is available
+    if (!vectorAvailable) {
+      console.warn("[VectorMemory] sqlite-vec not available, vector search disabled");
+      this.initialized = false;
+      return false;
+    }
+
     try {
-      // Check if sqlite-vec is loaded by trying to create a test virtual table
-      const result = db.run(sql`
+      // T3.2: Get current embedding dimension
+      this.currentDimension = getEmbeddingDimension();
+
+      // Check if table exists with different dimension
+      const tableInfo: any[] = await db.all(sql`SELECT name FROM sqlite_master WHERE type='table' AND name='memory_embeddings'`);
+      if (tableInfo.length > 0) {
+        // Check existing dimension by trying to get a sample
+        try {
+          const sample: any[] = await db.all(sql`SELECT embedding FROM memory_embeddings LIMIT 1`);
+          if (sample.length > 0 && sample[0].embedding) {
+            const existingDim = JSON.parse(sample[0].embedding).length;
+            if (existingDim !== this.currentDimension) {
+              console.log(`[VectorMemory] Dimension mismatch (${existingDim} vs ${this.currentDimension}), dropping table`);
+              await db.run(sql`DROP TABLE IF EXISTS memory_embeddings`);
+            }
+          }
+        } catch (e) {
+          // Table might be empty or have issues, try to recreate
+          await db.run(sql`DROP TABLE IF EXISTS memory_embeddings`);
+        }
+      }
+
+      // Create virtual table with current dimension
+      await db.run(sql`
         CREATE VIRTUAL TABLE IF NOT EXISTS memory_embeddings USING vec0(
           memory_id TEXT PRIMARY KEY,
           agent_id TEXT,
-          embedding FLOAT[768]
+          embedding FLOAT[${this.currentDimension}]
         )
       `);
       this.initialized = true;
-      console.log("[VectorMemory] Virtual table initialized");
+      console.log(`[VectorMemory] Virtual table initialized with dimension ${this.currentDimension}`);
       return true;
     } catch (error) {
       console.warn("[VectorMemory] Failed to initialize vector table:", error);

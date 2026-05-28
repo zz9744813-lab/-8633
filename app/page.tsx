@@ -58,6 +58,7 @@ interface WorldState {
   agents: AgentState[];
   events: WorldEvent[];
   eraPack?: any;
+  buildings?: any[]; // T4.1: Add buildings from world
 }
 
 function formatGameTime(tick: number): string {
@@ -145,6 +146,7 @@ export default function Home() {
             })),
             events: [],
             eraPack: message.world.eraPack,
+            buildings: message.world.buildings, // T4.1: Include buildings
           });
         } else if (message.type === "no_world") {
           // T1.4: No active world - show empty state
@@ -239,7 +241,7 @@ export default function Home() {
     }
   }, [worldState]);
 
-  // Agent positions for WorldView
+  // Agent positions for WorldView - T4.1: Use real data or empty
   const agentPositions = worldState?.agents.map((a) => ({
     id: a.id,
     x: a.x,
@@ -249,18 +251,18 @@ export default function Home() {
     currentActivity: a.activity,
     isMoving: a.isMoving,
     dir: a.dir,
-  })) || [
-    { id: "1", x: 400, y: 300, name: "居民1", occupation: "无业", currentActivity: "idle" },
-    { id: "2", x: 200, y: 400, name: "居民2", occupation: "无业", currentActivity: "idle" },
-    { id: "3", x: 600, y: 200, name: "居民3", occupation: "无业", currentActivity: "idle" },
-  ];
+  })) || [];
 
-  const buildingPositions = [
-    { id: "tavern", x: 200, y: 150, name: "酒馆", type: "tavern", width: 60, height: 60 },
-    { id: "market", x: 500, y: 200, name: "集市", type: "market", width: 60, height: 60 },
-    { id: "church", x: 350, y: 400, name: "教堂", type: "church", width: 60, height: 60 },
-    { id: "smithy", x: 600, y: 400, name: "铁匠铺", type: "blacksmith", width: 60, height: 60 },
-  ];
+  // T4.1: Use real buildings from world state
+  const buildingPositions = worldState?.buildings?.map((b: any) => ({
+    id: b.id,
+    x: b.position?.x ?? b.x ?? 0,
+    y: b.position?.y ?? b.y ?? 0,
+    name: b.name,
+    type: b.type,
+    width: b.width ?? 60,
+    height: b.height ?? 60,
+  })) || [];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

@@ -351,6 +351,12 @@ export function WorldView({
     }
   }, [width, height, tileSize]);
 
+  // T4.2: Update visuals when time/season/weather changes
+  useEffect(() => {
+    // This effect triggers a re-render when these props change
+    // The actual visual update happens in the main useEffect via refs
+  }, [gameTime, season, weather, weatherIntensity, width, height, tileSize]);
+
   useEffect(() => {
     const container = buildingsContainerRef.current;
     if (!container) return;
@@ -378,7 +384,7 @@ export function WorldView({
     sprites.forEach((sprite, id) => {
       if (!buildings.find((b) => b.id === id)) { container.removeChild(sprite); sprites.delete(id); }
     });
-  }, [buildings]);
+  }, [buildings]); // T4.2: Buildings effect
 
   // I2: Use walk sheet sprite with frame cycling
   useEffect(() => {

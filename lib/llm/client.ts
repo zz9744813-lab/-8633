@@ -12,6 +12,7 @@ export interface LLMConfig {
   apiKey?: string;
   baseUrl?: string; // For Ollama
   model: string;
+  roleModels?: Partial<Record<LLMRole, string>>; // T1.3: Optional per-role model overrides
 }
 
 export interface LLMClient {
@@ -148,18 +149,15 @@ const clients = new Map<string, LLMClient>();
 
 export type LLMRole = "plan" | "reflect" | "dialogue" | "score" | "chronicle" | "drama";
 
-const ROLE_MODEL_MAP: Record<LLMRole, string> = {
-  plan: "claude-sonnet-4-5",
-  reflect: "claude-sonnet-4-5",
-  dialogue: "claude-haiku-4-5",
-  score: "claude-haiku-4-5",
-  chronicle: "claude-sonnet-4-5",
-  drama: "claude-sonnet-4-5",
-};
-
+// T1.3: Optional role-based model mapping (user can configure in roleModels)
+// If not provided, uses the base model for all roles
 function getModelForRole(role: LLMRole, baseConfig: LLMConfig): string {
-  if (baseConfig.provider === "ollama") return baseConfig.model;
-  return ROLE_MODEL_MAP[role];
+  // If user provided roleModels mapping, use it
+  if (baseConfig.roleModels && baseConfig.roleModels[role]) {
+    return baseConfig.roleModels[role];
+  }
+  // Otherwise use the user's configured model
+  return baseConfig.model;
 }
 
 let globalClient: LLMClient | null = null;
@@ -195,7 +193,7 @@ export function getLLMClientFor(role: LLMRole): LLMClient {
     const config = (globalClient as any).config as LLMConfig;
     roleClients.set(role, new LLMClientImpl({
       ...config,
-      model: ROLE_MODEL_MAP[role],
+      model: getModelForRole(role, config),
     }));
   }
   return roleClients.get(role)!;

@@ -146,6 +146,9 @@ export default function Home() {
             events: [],
             eraPack: message.world.eraPack,
           });
+        } else if (message.type === "no_world") {
+          // T1.4: No active world - show empty state
+          setWorldState(null);
         }
       } catch (e) {
         console.error("Failed to parse SSE message:", e);
@@ -162,9 +165,25 @@ export default function Home() {
     eventSourceRef.current = es;
   }, []);
 
-  // Initial connection
+  // Initial connection and world loading
   useEffect(() => {
-    connect();
+    // T1.4: Try to load existing world first
+    fetch("/api/world")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.world) {
+          console.log("[Page] Loaded existing world:", data.world.name);
+          // World exists, connect to SSE
+          connect();
+        } else {
+          console.log("[Page] No active world, showing empty state");
+          // No world - will show empty state UI
+        }
+      })
+      .catch((e) => {
+        console.error("[Page] Failed to check world status:", e);
+      });
+
     return () => {
       eventSourceRef.current?.close();
     };

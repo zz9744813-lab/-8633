@@ -4,6 +4,8 @@ import { loadEraPack, generateAgentIdentity, pickLanguages } from "@/lib/era-pac
 import { AgentIdentity, Building } from "@/lib/types";
 import { generatePortrait } from "@/lib/sprite-generator";
 import { worldRepository } from "@/db/world-repository";
+import { initLLM } from "@/lib/llm/client";
+import { initEmbeddings } from "@/lib/llm/embeddings";
 
 export const dynamic = "force-dynamic";
 
@@ -11,13 +13,47 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, worldId, eraPackId = "18th_england", width = 800, height = 600, population = 3 } = body;
+    const { name, worldId, eraPackId = "18th_england", width = 800, height = 600, population = 3, apiConfig, embeddingConfig } = body;
 
     // Generate a unique worldId if not provided
     const id = worldId || `world-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
 
     if (!name) {
       return NextResponse.json({ error: "World name is required" }, { status: 400 });
+    }
+
+    // T1.2: Validate and initialize LLM before creating world
+    if (!apiConfig) {
+      return NextResponse.json({
+        error: "未配置模型，请先在配置面板填写并启用一个模型"
+      }, { status: 400 });
+    }
+
+    // Initialize LLM with provided config
+    try {
+      initLLM({
+        provider: apiConfig.provider,
+        apiKey: apiConfig.apiKey,
+        model: apiConfig.model,
+        baseUrl: apiConfig.baseUrl,
+      });
+      console.log(`[World] LLM initialized with ${apiConfig.provider}/${apiConfig.model}`);
+    } catch (e) {
+      console.error("[World] Failed to initialize LLM:", e);
+      return NextResponse.json({
+        error: `模型初始化失败: ${e instanceof Error ? e.message : "未知错误"}`
+      }, { status: 500 });
+    }
+
+    // Initialize embeddings if config provided
+    if (embeddingConfig) {
+      try {
+        initEmbeddings(embeddingConfig);
+        console.log(`[World] Embeddings initialized with ${embeddingConfig.provider}/${embeddingConfig.model}`);
+      } catch (e) {
+        console.warn("[World] Failed to initialize embeddings:", e);
+        // Non-fatal, continue without embeddings
+      }
     }
 
     // Load era pack

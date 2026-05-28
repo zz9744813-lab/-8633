@@ -1,14 +1,44 @@
 import { NextRequest } from "next/server";
 import { getWorld } from "@/lib/agent";
+import { worldRepository } from "@/db/world-repository";
 
 export const dynamic = "force-dynamic";
 
 // SSE endpoint for real-time world updates
 export async function GET(request: NextRequest) {
-  const world = getWorld();
+  let world = getWorld();
+
+  // T1.4: If no active world, try to load from DB
+  if (!world) {
+    try {
+      const worlds = await worldRepository.listWorlds();
+      if (worlds.length > 0) {
+        const latest = worlds[0];
+        const { createWorldOrLoad } = await import("@/lib/agent");
+        world = await createWorldOrLoad(latest.id, latest.name, latest.width, latest.height, null);
+        console.log(`[SSE] Loaded latest world "${latest.name}" from DB`);
+      }
+    } catch (e) {
+      console.error("[SSE] Failed to load world from DB:", e);
+    }
+  }
 
   if (!world) {
-    return new Response("No active world", { status: 404 });
+    // Return SSE with no_world event instead of 404
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        const data = `data: ${JSON.stringify({ type: "no_world" })}\n\n`;
+        controller.enqueue(encoder.encode(data));
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
   }
 
   const encoder = new TextEncoder();

@@ -112,6 +112,13 @@ export function ConfigPanel({ isOpen, onClose, onConfigChange }: ConfigPanelProp
           name,
           eraPackId: config.eraPackId || "18th_england",
           population: config.maxAgents,
+          apiConfig: activeModel,
+          embeddingConfig: {
+            provider: config.embeddingProvider,
+            model: config.embeddingModel,
+            apiKey: config.embeddingApiKey,
+            baseUrl: config.embeddingBaseUrl,
+          },
         }),
       });
 

@@ -8,13 +8,26 @@ interface EmbeddingConfig {
   baseUrl?: string;
 }
 
+let currentEmbeddingConfig: EmbeddingConfig | null = null;
+
 const DEFAULT_CONFIG: EmbeddingConfig = {
   provider: "ollama",
   model: "nomic-embed-text",
   baseUrl: "http://localhost:11434",
 };
 
+// Initialize embeddings with user config (called from API)
+export function initEmbeddings(config: EmbeddingConfig): void {
+  currentEmbeddingConfig = config;
+  console.log(`[Embeddings] Initialized with ${config.provider}/${config.model}`);
+}
+
 function getConfig(): EmbeddingConfig {
+  // Priority: initialized config > env vars > default
+  if (currentEmbeddingConfig) {
+    return currentEmbeddingConfig;
+  }
+
   const provider = (process.env.EMBEDDING_PROVIDER as "ollama" | "openai") || "ollama";
   const model = process.env.EMBEDDING_MODEL || (provider === "ollama" ? "nomic-embed-text" : "text-embedding-3-small");
   const apiKey = process.env.EMBEDDING_API_KEY || process.env.OPENAI_API_KEY;

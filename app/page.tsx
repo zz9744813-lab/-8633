@@ -237,10 +237,10 @@ export default function Home() {
   ];
 
   const buildingPositions = [
-    { x: 200, y: 150, name: "酒馆" },
-    { x: 500, y: 200, name: "集市" },
-    { x: 350, y: 400, name: "教堂" },
-    { x: 600, y: 400, name: "铁匠铺" },
+    { id: "tavern", x: 200, y: 150, name: "酒馆", type: "tavern", width: 60, height: 60 },
+    { id: "market", x: 500, y: 200, name: "集市", type: "market", width: 60, height: 60 },
+    { id: "church", x: 350, y: 400, name: "教堂", type: "church", width: 60, height: 60 },
+    { id: "smithy", x: 600, y: 400, name: "铁匠铺", type: "blacksmith", width: 60, height: 60 },
   ];
 
   return (
@@ -300,6 +300,7 @@ export default function Home() {
             height={600}
             tileSize={10}
             agents={agentPositions}
+            buildings={buildingPositions}
             weather={worldState?.weather}
             weatherIntensity={worldState?.weatherIntensity}
             season={worldState?.season}

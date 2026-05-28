@@ -320,7 +320,8 @@ export function WorldView({
       ground.clear();
       for (let x = 0; x < width; x += tileSize) {
         for (let y = 0; y < height; y += tileSize) {
-          const variation = Math.random() * 0x080808;
+          const v = Math.floor(Math.random() * 8);
+          const variation = (v << 16) | (v << 8) | v;
           ground.rect(x, y, tileSize, tileSize);
           ground.fill(colors.ground + variation);
         }

@@ -29,7 +29,9 @@ export class World {
   weatherIntensity: number = 0;
   weatherEndsAtTick: number = 0;
 
-  private tickInterval: NodeJS.Timeout | null = null;
+  // T2.1: Fixed lifecycle
+  private tickTimeout: NodeJS.Timeout | null = null;
+  private lastTickTime: number = 0;
   private running: boolean = false;
   onTickCallbacks: Array<(world: World) => void> = [];
 
@@ -676,32 +678,46 @@ export class World {
   start(): void {
     if (this.running) return;
     this.running = true;
-    const loop = async () => {
-      while (this.running) {
-        const start = performance.now();
-        try {
+    this.scheduleNextTick();
+    console.log(`[World] Started simulation at ${this.speed}x speed`);
+  }
+
+  private scheduleNextTick(): void {
+    if (!this.running) return;
+
+    const interval = this.paused ? 1000 : (1000 / this.speed);
+    this.tickTimeout = setTimeout(async () => {
+      if (!this.running) return;
+
+      const start = performance.now();
+      try {
+        if (!this.paused) {
           await this.step();
-        } catch (e) {
-          console.error("[World] Step failed:", e);
         }
-        const elapsed = performance.now() - start;
-        const wait = Math.max(0, (1000 / this.speed) - elapsed);
-        await new Promise(r => setTimeout(r, wait));
+      } catch (e) {
+        console.error("[World] Step failed:", e);
       }
-    };
-    loop();
+      const elapsed = performance.now() - start;
+      this.lastTickTime = elapsed;
+
+      // Schedule next tick
+      this.scheduleNextTick();
+    }, interval);
   }
 
   stop(): void {
     this.running = false;
+    if (this.tickTimeout) {
+      clearTimeout(this.tickTimeout);
+      this.tickTimeout = null;
+    }
+    console.log("[World] Stopped simulation");
   }
 
   setSpeed(speed: number): void {
-    this.speed = speed;
-    if (this.tickInterval) {
-      this.stop();
-      this.start();
-    }
+    this.speed = Math.max(0.1, speed);
+    console.log(`[World] Speed set to ${this.speed}x`);
+    // The next scheduled tick will use the new speed
   }
 
   onTick(callback: (world: World) => void): void {

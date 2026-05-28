@@ -8,37 +8,53 @@ import fs from "fs";
 const DB_DIR = "./data";
 const DB_PATH = process.env.DATABASE_URL ?? "./data/world.db";
 
+// T2.2: Use globalThis to prevent duplicate instances on hot reload
+const g = globalThis as any;
+
 // Ensure data directory exists
 if (!fs.existsSync(DB_DIR)) {
   fs.mkdirSync(DB_DIR, { recursive: true });
 }
 
-const sqlite = new Database(DB_PATH);
+// Create or reuse cached database instance
+export const sqlite = g.__ptDb ?? (g.__ptDb = new Database(DB_PATH));
 sqlite.pragma("journal_mode = WAL");
 
-// Load sqlite-vec extension for vector search
+export const db = g.__ptDbDrizzle ?? (g.__ptDbDrizzle = drizzle(sqlite, { schema }));
+
+// T3.1: Track vector extension loading state
+export let vectorAvailable = g.__ptVectorAvailable ?? false;
+
+// Load sqlite-vec extension for vector search (sync version with proper error handling)
 try {
-  // ESM import for sqlite-vec
-  import("sqlite-vec").then(sqliteVec => {
+  // Try to load sqlite-vec synchronously if available
+  const sqliteVec = require("sqlite-vec");
+  if (sqliteVec && sqliteVec.load) {
     sqliteVec.load(sqlite);
+    vectorAvailable = true;
+    g.__ptVectorAvailable = true;
     console.log("[DB] sqlite-vec extension loaded");
-  }).catch(error => {
-    console.error("[DB] sqlite-vec FAILED:", error);
-    console.error("[DB] Vector search will not be available");
-  });
+  }
 } catch (error) {
-  console.error("[DB] sqlite-vec FAILED:", error);
-  console.error("[DB] Vector search will not be available");
+  console.warn("[DB] sqlite-vec not available:", (error as Error).message);
+  console.warn("[DB] Vector search will be disabled, falling back to keyword search");
+  vectorAvailable = false;
+  g.__ptVectorAvailable = false;
 }
 
-export const db = drizzle(sqlite, { schema });
-
-// Run migrations on startup
+// Run migrations on startup (only once due to globalThis caching)
 export function runMigrations() {
   const migrationsFolder = path.join(process.cwd(), "db", "migrations");
   if (fs.existsSync(migrationsFolder)) {
     migrate(db, { migrationsFolder });
+    console.log("[DB] Migrations completed");
   }
+}
+
+// Run migrations once
+if (!g.__ptMigrationsRun) {
+  runMigrations();
+  g.__ptMigrationsRun = true;
 }
 
 // Ensure chronicles table exists (F1: Chronicle 编年史)

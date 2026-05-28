@@ -2,9 +2,16 @@ import { World } from "./world";
 import { EraPack } from "@/lib/era-pack/loader";
 import { worldRepository } from "@/db/world-repository";
 
-// Global world instance
-let currentWorld: World | null = null;
-const worldRegistry = new Map<string, World>();
+// T2.2: Use globalThis to prevent duplicate instances on hot reload
+const g = globalThis as any;
+
+// Global world instance - cached on globalThis
+let currentWorld: World | null = g.__ptCurrentWorld ?? null;
+const worldRegistry: Map<string, World> = g.__ptWorldRegistry ?? new Map<string, World>();
+
+// Sync with globalThis
+g.__ptCurrentWorld = currentWorld;
+g.__ptWorldRegistry = worldRegistry;
 
 export function createWorld(
   id: string,

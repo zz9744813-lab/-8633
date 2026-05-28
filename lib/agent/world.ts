@@ -9,6 +9,7 @@ import { initBuildingEconomy, calculatePrice, ITEMS } from "@/lib/economy/engine
 import { worldEventSystem } from "@/db/world-event-repository";
 import { worldRepository } from "@/db/world-repository";
 import { relationshipManager } from "@/db/relationship-repository";
+import { isLLMInitialized } from "@/lib/llm/client";
 
 // T5.1: Batch memory queue for performance
 interface PendingMemory {
@@ -422,12 +423,19 @@ export class World {
 
         // Only plan if we've passed the stagger offset
         if (currentMinutes % 30 >= staggerOffset || !agent.dailyPlan) {
-          await agent.generateDailyPlan(this.tickCount, {
-            buildings: this.buildings,
-            currentTime: worldState.currentTime,
-            weather: this.currentWeather,
-            weatherIntensity: this.weatherIntensity,
-          });
+          // T6.1: Check if LLM is initialized
+          if (isLLMInitialized()) {
+            await agent.generateDailyPlan(this.tickCount, {
+              buildings: this.buildings,
+              currentTime: worldState.currentTime,
+              weather: this.currentWeather,
+              weatherIntensity: this.weatherIntensity,
+            });
+          } else {
+            // T6.1: Use fallback rule-based plan when LLM not available
+            agent.dailyPlan = agent.generateFallbackPlan(this.tickCount, hour, this.buildings);
+            console.log(`[World] ${agent.identity.name} using fallback plan (LLM not initialized)`);
+          }
         }
       }
 

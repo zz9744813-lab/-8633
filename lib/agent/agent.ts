@@ -229,21 +229,136 @@ ${relevantMemories.length > 0
     } catch (error) {
       console.error("Failed to generate daily plan:", error);
 
-      // Fallback to basic plan
-      this.dailyPlan = {
-        morningThought: "今天又是普通的一天。",
-        steps: [
-          { time: "06:00", action: "WORK", description: "开始工作", reason: "维持生计" },
-          { time: "12:00", action: "EAT", description: "吃午饭", reason: "补充能量" },
-          { time: "18:00", action: "WORK", description: "继续工作", reason: "完成任务" },
-          { time: "22:00", action: "SLEEP", description: "睡觉休息", reason: "恢复精力" },
-        ],
-        currentStepIdx: 0,
-        plannedAtTick: currentTick,
-      };
-
-      return this.dailyPlan;
+      // T6.1: Use fallback plan instead of basic hardcoded plan
+      return this.generateFallbackPlan(currentTick, 6, []);
     }
+  }
+
+  // T6.1: Generate fallback plan when LLM is not available
+  generateFallbackPlan(currentTick: number, _currentHour: number, buildings: Array<{ id: string; name: string; type: string; position: Position }>): DailyPlan {
+    const occupation = this.identity.occupation;
+    const isLaborer = ["farmer", "blacksmith", "miner", "carpenter", "weaver"].some(o =>
+      occupation.toLowerCase().includes(o)
+    );
+
+    // Find relevant buildings
+    const home = buildings.find(b => b.type === "house" || b.type === "home") || buildings[0];
+    const workplace = buildings.find(b => {
+      const occLower = occupation.toLowerCase();
+      if (occLower.includes("blacksmith")) return b.type === "blacksmith" || b.type === "smithy";
+      if (occLower.includes("farmer")) return b.type === "farm" || b.type === "field";
+      if (occLower.includes("tavern") || occLower.includes("innkeeper")) return b.type === "tavern";
+      if (occLower.includes("merchant")) return b.type === "market" || b.type === "shop";
+      if (occLower.includes("priest") || occLower.includes("cleric")) return b.type === "church" || b.type === "temple";
+      return b.type === "workshop" || b.type === "market";
+    }) || buildings.find(b => b.type === "market") || buildings[1];
+
+    const tavern = buildings.find(b => b.type === "tavern");
+    const market = buildings.find(b => b.type === "market");
+
+    const steps: PlanStep[] = [];
+
+    // Morning (6:00) - Wake up at home
+    steps.push({
+      time: "06:00",
+      action: "WAIT",
+      target: home?.id,
+      description: "起床准备",
+      reason: "开始新的一天"
+    });
+
+    // Work time for laborers (7:00-12:00)
+    if (isLaborer && workplace) {
+      steps.push({
+        time: "07:00",
+        action: "WORK",
+        target: workplace.id,
+        description: `去${workplace.name}工作`,
+        reason: "谋生"
+      });
+    } else if (market) {
+      // Non-laborers go to market
+      steps.push({
+        time: "07:00",
+        action: "MOVE_TO",
+        target: market.id,
+        description: `去${market.name}看看`,
+        reason: "了解行情"
+      });
+    }
+
+    // Lunch time (12:00)
+    if (tavern) {
+      steps.push({
+        time: "12:00",
+        action: "EAT",
+        target: tavern.id,
+        description: `在${tavern.name}吃午餐`,
+        reason: "补充能量"
+      });
+    } else {
+      steps.push({
+        time: "12:00",
+        action: "EAT",
+        description: "吃午饭",
+        reason: "补充能量"
+      });
+    }
+
+    // Afternoon work (13:00-18:00)
+    if (isLaborer && workplace) {
+      steps.push({
+        time: "13:00",
+        action: "WORK",
+        target: workplace.id,
+        description: "继续工作",
+        reason: "完成任务"
+      });
+    } else if (tavern) {
+      // Social time
+      steps.push({
+        time: "13:00",
+        action: "MOVE_TO",
+        target: tavern.id,
+        description: `去${tavern.name}休息`,
+        reason: "放松身心"
+      });
+    }
+
+    // Evening meal (18:00)
+    steps.push({
+      time: "18:00",
+      action: "EAT",
+      description: "吃晚饭",
+      reason: "补充能量"
+    });
+
+    // Social time (19:00-21:00)
+    if (tavern) {
+      steps.push({
+        time: "19:00",
+        action: "MOVE_TO",
+        target: tavern.id,
+        description: `去${tavern.name}社交`,
+        reason: "与朋友交流"
+      });
+    }
+
+    // Sleep (22:00)
+    steps.push({
+      time: "22:00",
+      action: "SLEEP",
+      target: home?.id,
+      description: "回家睡觉",
+      reason: "恢复精力"
+    });
+
+    return {
+      morningThought: "今天又是普通的一天。",
+      steps,
+      currentStepIdx: 0,
+      plannedAtTick: currentTick,
+    };
   }
 
   // Get current action from plan based on time

@@ -365,7 +365,7 @@ export function WorldView({
         buildingSprite.anchor.set(0.5);
         buildingSprite.scale.set(2);
         sprite.addChild(buildingSprite);
-        const text = new PIXI.Text({ text: building.name, style: { fontSize: 11, fill: 0xffffff, fontFamily: "sans-serif", stroke: { color: 0x000000, width: 3 }, dropShadow: { color: 0x000000, distance: 1 } } });
+        const text = new PIXI.Text({ text: building.name, style: { fontSize: 11, fill: 0xffffff, fontFamily: "sans-serif", stroke: { color: 0x000000, width: 3 } } });
         text.anchor.set(0.5, 1);
         text.position.set(0, -20);
         sprite.addChild(text);

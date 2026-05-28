@@ -124,7 +124,7 @@ export class MemoryRepository {
       .where(eq(memories.agentId, agentId))
       .orderBy(desc(memories.tick));
 
-    return all.filter((m) =>
+    return all.filter((m: { relatedAgentIds: unknown }) =>
       (m.relatedAgentIds as string[] | null)?.some((id) => targetAgentIds.includes(id))
     );
   }
@@ -147,7 +147,7 @@ export class MemoryRepository {
       .orderBy(desc(memories.importance), desc(memories.tick))
       .limit(keepCount);
 
-    const keepIds = memoriesToKeep.map((m) => m.id);
+    const keepIds = memoriesToKeep.map((m: { id: string }) => m.id);
 
     if (keepIds.length === 0) {
       // No memories to keep, delete all for this agent

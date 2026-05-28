@@ -64,7 +64,7 @@ export class RumorRepository {
       .from(rumors)
       .where(eq(rumors.worldId, worldId))
       .orderBy(desc(rumors.tick));
-    return all.filter((r) => r.knownByIds?.includes(agentId));
+    return all.filter((r: typeof rumors.$inferSelect) => r.knownByIds?.includes(agentId));
   }
 
   // Get all rumors in a world

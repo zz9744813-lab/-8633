@@ -181,9 +181,9 @@ export class VectorMemoryStore {
         .where(eq(memories.agentId, agentId));
 
       return fallback
-        .filter((m) => m.content.toLowerCase().includes(query.toLowerCase()))
+        .filter((m: typeof memories.$inferSelect) => m.content.toLowerCase().includes(query.toLowerCase()))
         .slice(0, limit)
-        .map((m) => ({
+        .map((m: typeof memories.$inferSelect) => ({
           memoryId: m.id,
           agentId: m.agentId,
           content: m.content,

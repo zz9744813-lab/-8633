@@ -65,7 +65,7 @@ export class WorldEventSystem {
       .orderBy(desc(worldEvents.tick))
       .limit(limit);
 
-    return result.map((r) => ({
+    return result.map((r: typeof worldEvents.$inferSelect) => ({
       id: r.id,
       worldId: r.worldId,
       tick: r.tick,

@@ -179,7 +179,7 @@ export class WorldRepository {
       .from(buildingsTable)
       .where(eq(buildingsTable.worldId, worldId));
 
-    const loadedBuildings: Building[] = buildingRecords.map((b) => ({
+    const loadedBuildings: Building[] = buildingRecords.map((b: typeof buildingsTable.$inferSelect) => ({
       id: b.id,
       type: b.type as BuildingType,
       name: b.name ?? "",
@@ -196,7 +196,7 @@ export class WorldRepository {
       .from(agentsTable)
       .where(eq(agentsTable.worldId, worldId));
 
-    const loadedAgents: SerializedAgent[] = agentRecords.map((a) => {
+    const loadedAgents: SerializedAgent[] = agentRecords.map((a: typeof agentsTable.$inferSelect) => {
       const identity = (a.identity as AgentIdentity) || {
         name: a.name,
         age: a.age,
@@ -315,7 +315,7 @@ export class WorldRepository {
       .from(worlds)
       .orderBy(desc(worlds.updatedAt));
 
-    return records.map((r) => ({
+    return records.map((r: typeof worlds.$inferSelect) => ({
       id: r.id,
       name: r.name,
       width: r.width ?? 100,

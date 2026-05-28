@@ -127,7 +127,7 @@ export class ChronicleRepository {
       .groupBy(chronicles.year)
       .orderBy(desc(chronicles.year));
 
-    return result.map((r) => r.year);
+    return result.map((r: { year: number }) => r.year);
   }
 
   // Get latest chronicles
@@ -167,7 +167,7 @@ export class ChronicleRepository {
       .from(chronicles)
       .orderBy(desc(chronicles.tick));
     return all
-      .filter((c) => c.agentIds?.includes(agentId))
+      .filter((c: { agentIds: string[] | null }) => c.agentIds?.includes(agentId))
       .slice(0, limit);
   }
 
